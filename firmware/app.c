@@ -22,67 +22,117 @@
 #include <i2c.h>
 #include <setupdat.h>
 
-#define SYNCDELAY() SYNCDELAY4;
+#define SYNCDELAY SYNCDELAY4;
 #define EP0BUF_SIZE 0x40
 
-#define bmSYNCFIFOS (bmIFCFG1 | bmIFCFG0)
+// IFCONFIG bits
+#define bmPORTS 0
+#define bmGPIF  (bmIFCFG1)
+#define bmFIFOS (bmIFCFG1 | bmIFCFG0)
+
+// EPxCFG bits
 #define bmBULK bmBIT5
-#define bmDOUBLEBUFFERED bmBIT1
+#define bmBUF2X bmBIT1
+
+// OUTPKTEND bits
 #define bmSKIP bmBIT7
 
+// REVCTL bits
 #define bmDYN_OUT (1<<1)
 #define bmENH_PKT (1<<0)
 
-BYTE currentConfiguration;  // Current configuration
-BYTE alternateSetting = 0;  // Alternate settings
+BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf);
+BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf);
+
+// The minimum number of bytes necessary to store this many bits
+#define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
+
+// Addressable bits on Port D for the four JTAG lines (named after the FPGA pins they connect to)
+// TDO is an input, the rest are outputs.
+sbit at 0xB0      TDO; /* Port D.0 */
+sbit at 0xB2      TDI; /* Port D.2 */
+sbit at 0xB3      TMS; /* Port D.3 */
+sbit at 0xB4      TCK; /* Port D.4 */
+
+// Equivalent bitmasks for OED and IOD.
+#define bmTDO     bmBIT0
+#define bmTDI     bmBIT2
+#define bmTMS     bmBIT3
+#define bmTCK     bmBIT4
+
+enum SendType {
+	SEND_ZEROS,
+	SEND_ONES,
+	SEND_DATA,
+	SEND_MASK
+};
+
+enum {
+	IS_RESPONSE_NEEDED = 0,
+	IS_LAST = 1,
+	SEND_TYPE = 2
+};
+
+enum {
+	CMD_CLOCK_DATA = 0x80,
+	CMD_CLOCK_STATE_MACHINE,
+	CMD_CLOCK
+};
 
 // Called once at startup
 //
 void main_init(void) {
-	SYNCDELAY(); REVCTL = (bmDYN_OUT | bmENH_PKT);
-	SYNCDELAY(); CPUCS = bmCLKSPD1;  // 48MHz
-	SYNCDELAY(); IFCONFIG = (bmIFCLKSRC | bm3048MHZ | bmIFCLKOE | bmSYNCFIFOS);  // drive IFCLK with internal 30MHz clock, select synchronous FIFOs
-	SYNCDELAY(); EP2CFG = (bmVALID | bmBULK | bmDOUBLEBUFFERED);
-	SYNCDELAY(); EP4CFG = (bmVALID | bmBULK | bmDOUBLEBUFFERED | bmDIR);
-	SYNCDELAY(); EP6CFG = (bmVALID | bmBULK | bmDOUBLEBUFFERED);
-	SYNCDELAY(); EP8CFG = (bmVALID | bmBULK | bmDOUBLEBUFFERED | bmDIR);
-	SYNCDELAY(); FIFORESET = bmNAKALL;
-	SYNCDELAY(); FIFORESET = bmNAKALL | 2;  // reset EP2
-	SYNCDELAY(); FIFORESET = bmNAKALL | 4;  // reset EP4
-	SYNCDELAY(); FIFORESET = bmNAKALL | 6;  // reset EP6
-	SYNCDELAY(); FIFORESET = bmNAKALL | 8;  // reset EP8
-	SYNCDELAY(); FIFORESET = 0x00;
-	SYNCDELAY(); OUTPKTEND = bmSKIP | 2;
-	SYNCDELAY(); OUTPKTEND = bmSKIP | 2;
-	SYNCDELAY(); OUTPKTEND = bmSKIP | 6;
-	SYNCDELAY(); OUTPKTEND = bmSKIP | 6;
-	SYNCDELAY(); EP2FIFOCFG = 0x00;
-	SYNCDELAY(); EP4FIFOCFG = 0x00;
-	SYNCDELAY(); EP6FIFOCFG = bmAUTOOUT;
-	SYNCDELAY(); EP8FIFOCFG = bmAUTOIN;
-	SYNCDELAY();
+
+	// Global settings
+	SYNCDELAY; REVCTL = (bmDYN_OUT | bmENH_PKT);
+	SYNCDELAY; CPUCS = bmCLKSPD1;  // 48MHz
+
+	// Drive IFCLK at 48MHz, enable slave FIFOs
+	SYNCDELAY; IFCONFIG = (bmIFCLKSRC | bm3048MHZ | bmIFCLKOE | bmFIFOS);
+
+	// EP2OUT & EP4IN are handled by firmware, EP6OUT & EP8IN connect to Slave FIFOs
+	SYNCDELAY; EP2CFG = (bmVALID | bmBULK | bmBUF2X);
+	SYNCDELAY; EP4CFG = (bmVALID | bmBULK | bmBUF2X | bmDIR);
+	SYNCDELAY; EP6CFG = (bmVALID | bmBULK | bmBUF2X);
+	SYNCDELAY; EP8CFG = (bmVALID | bmBULK | bmBUF2X | bmDIR);
+
+	// Reset all the FIFOs
+	SYNCDELAY; FIFORESET = bmNAKALL;
+	SYNCDELAY; FIFORESET = bmNAKALL | 2;  // reset EP2
+	SYNCDELAY; FIFORESET = bmNAKALL | 4;  // reset EP4
+	SYNCDELAY; FIFORESET = bmNAKALL | 6;  // reset EP6
+	SYNCDELAY; FIFORESET = bmNAKALL | 8;  // reset EP8
+	SYNCDELAY; FIFORESET = 0x00;
+
+	// Arm the OUT buffers. Done twice because they're double-buffered
+	SYNCDELAY; OUTPKTEND = bmSKIP | 2;  // EP2OUT
+	SYNCDELAY; OUTPKTEND = bmSKIP | 2;
+	SYNCDELAY; OUTPKTEND = bmSKIP | 6;  // EP6OUT
+	SYNCDELAY; OUTPKTEND = bmSKIP | 6;
+
+	// EP2OUT & EP4IN handled by firmware, so no FIFOs
+	SYNCDELAY; EP2FIFOCFG = 0x00;
+	SYNCDELAY; EP4FIFOCFG = 0x00;
+
+	// EP6OUT & EP8IN connected to Slave FIFOs, so AUTOOUT & AUTOIN respectively
+	SYNCDELAY; EP6FIFOCFG = bmAUTOOUT;
+	SYNCDELAY; EP8FIFOCFG = bmAUTOIN;
+	SYNCDELAY;
+	
+	// Auto-commit 512-byte packets from EP8IN (master may commit early by asserting PKTEND)
+	SYNCDELAY; EP8AUTOINLENH = 0x02;
+	SYNCDELAY; EP8AUTOINLENL = 0x00;
+	
+	// Port lines zero'd before setting direction
+	IOD = 0x00;
+
+	// Three JTAG bits drive pins on the FPGA
+	OED = bmTDI | bmTMS | bmTCK;
 }
 
 // Called repeatedly while the device is idle
 //
 void main_loop(void) { }
-
-// Called when a Set Configuration command is received
-//
-BOOL handle_set_configuration(BYTE cfg) {
-	currentConfiguration = cfg;
-	return(TRUE);  // Handled by user code
-}
-
-// Called when a Get Configuration command is received
-//
-BYTE handle_get_configuration()
-{
-	return currentConfiguration;
-}
-
-BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf);
-BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf);
 
 // Called when a vendor command is received
 //
@@ -106,7 +156,7 @@ BOOL handle_vendorcommand(BYTE cmd) {
 			outArray[2] = inArray[0] * inArray[1];
 			outArray[3] = inArray[0] / inArray[1];
 			EP0BCH = 0;
-			SYNCDELAY();
+			SYNCDELAY;
 			EP0BCL = 8;
 		} else {
 			// This command does not support OUT operations
@@ -133,7 +183,7 @@ BOOL handle_vendorcommand(BYTE cmd) {
 				}
 				promRead(address, chunkSize, EP0BUF);
 				EP0BCH = 0;
-				SYNCDELAY();
+				SYNCDELAY;
 				EP0BCL = chunkSize;
 				address += chunkSize;
 				length -= chunkSize;
@@ -159,62 +209,6 @@ BOOL handle_vendorcommand(BYTE cmd) {
 	}
 	return TRUE;
 }
-
-// Called when a Get Interface command is received
-//
-BOOL handle_get_interface(BYTE ifc, BYTE *alt) {
-	*alt = alternateSetting;
-	return TRUE;
-}
-
-// Called when a Set Interface command is received
-//
-BOOL handle_set_interface(BYTE ifc, BYTE alt) {
-	alternateSetting = alt;
-	return TRUE;
-}
-
-/*void sof_isr() interrupt SOF_ISR {
-	CLEAR_SOF();
-}
-void sutok_isr() interrupt SUTOK_ISR {}
-void ep0ack_isr() interrupt EP0ACK_ISR {}
-void ep0in_isr() interrupt EP0IN_ISR {}
-void ep0out_isr() interrupt EP0OUT_ISR {}
-void ep1in_isr() interrupt EP1IN_ISR {}
-void ep1out_isr() interrupt EP1OUT_ISR {}
-void ep2_isr() interrupt EP2_ISR {}
-void ep4_isr() interrupt EP4_ISR {}
-void ep6_isr() interrupt EP6_ISR {}
-void ep8_isr() interrupt EP8_ISR {}
-void ibn_isr() interrupt IBN_ISR {}
-void ep0ping_isr() interrupt EP0PING_ISR {}
-void ep1ping_isr() interrupt EP1PING_ISR {}
-void ep2ping_isr() interrupt EP2PING_ISR {}
-void ep4ping_isr() interrupt EP4PING_ISR {}
-void ep6ping_isr() interrupt EP6PING_ISR {}
-void ep8ping_isr() interrupt EP8PING_ISR {}
-void errlimit_isr() interrupt ERRLIMIT_ISR {}
-void ep2isoerr_isr() interrupt EP2ISOERR_ISR {}
-void ep4isoerr_isr() interrupt EP4ISOERR_ISR {}
-void ep6isoerr_isr() interrupt EP6ISOERR_ISR {}
-void ep8isoerr_isr() interrupt EP8ISOERR_ISR {}
-void spare_isr() interrupt RESERVED_ISR {}
-void ep2pf_isr() interrupt EP2PF_ISR{}
-void ep4pf_isr() interrupt EP4PF_ISR{}
-void ep6pf_isr() interrupt EP6PF_ISR{}
-void ep8pf_isr() interrupt EP8PF_ISR{}
-void ep2ef_isr() interrupt EP2EF_ISR{}
-void ep4ef_isr() interrupt EP4EF_ISR{}
-void ep6ef_isr() interrupt EP6EF_ISR{}
-void ep8ef_isr() interrupt EP8EF_ISR{}
-void ep2ff_isr() interrupt EP2FF_ISR{}
-void ep4ff_isr() interrupt EP4FF_ISR{}
-void ep6ff_isr() interrupt EP6FF_ISR{}
-void ep8ff_isr() interrupt EP8FF_ISR{}
-void gpifdone_isr() interrupt GPIFDONE_ISR{}
-void gpifwf_isr() interrupt GPIFWF_ISR{}
-*/
 
 BOOL promWaitForDone() {
 	BYTE i;
@@ -356,4 +350,35 @@ BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf) {
 	} while ( !(I2CS & bmACK) );
 	
 	return 0;
+}
+
+BYTE currentConfiguration;  // Current configuration
+BYTE alternateSetting = 0;  // Alternate settings
+
+// Called when a Set Configuration command is received
+//
+BOOL handle_set_configuration(BYTE cfg) {
+	currentConfiguration = cfg;
+	return(TRUE);  // Handled by user code
+}
+
+// Called when a Get Configuration command is received
+//
+BYTE handle_get_configuration()
+{
+	return currentConfiguration;
+}
+
+// Called when a Get Interface command is received
+//
+BOOL handle_get_interface(BYTE ifc, BYTE *alt) {
+	*alt = alternateSetting;
+	return TRUE;
+}
+
+// Called when a Set Interface command is received
+//
+BOOL handle_set_interface(BYTE ifc, BYTE alt) {
+	alternateSetting = alt;
+	return TRUE;
 }
