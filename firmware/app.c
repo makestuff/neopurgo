@@ -138,7 +138,7 @@ void main_loop(void) { }
 //
 BOOL handle_vendorcommand(BYTE cmd) {
 	WORD address, length;
-	BYTE i, chunkSize;
+	BYTE i, j, chunkSize;
 	switch(cmd) {
 	case 0x80:
 		// Simple example command which does the four arithmetic operations on the data from
@@ -164,6 +164,50 @@ BOOL handle_vendorcommand(BYTE cmd) {
 			return FALSE;
 		}
 		break;
+		
+		case 0x90:
+			if ( SETUP_TYPE == 0xc0 ) {
+				const unsigned short *inArray = (unsigned short *)(SETUPDAT+2);
+				unsigned long *outArray = (unsigned long *)EP0BUF, *ptr = outArray;
+				unsigned long thisID;
+				
+				// Go to Test-Logic-Reset
+				IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				
+				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Run-Test/Idle
+				IOD = bmTMS; IOD = bmTMS|bmTCK; IOD = bmTMS;     // Now in Select-DR Scan
+				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Capture-DR
+				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Shift-DR
+				
+				for ( j = 0; j < 4; j++ ) {
+					thisID = 0UL;
+					for ( i = 0; i < 31; i++ ) {
+						if ( TDO ) {
+							thisID |= 0x80000000;
+						}
+						TCK = 1; TCK = 0;
+						thisID >>= 1;
+					}
+					if ( TDO ) {
+						thisID |= 0x80000000;
+					}
+					TCK = 1; TCK = 0;
+					*ptr++ = thisID;
+				}
+				SYNCDELAY; EP0BCH = 0;
+				SYNCDELAY; EP0BCL = 16;
+			} else {
+				// This command does not support OUT operations
+				//
+				return FALSE;
+			}
+			break;
+
 	case 0xa2:
 		// Command to talk to the EEPROM
 		//
