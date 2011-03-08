@@ -1,0 +1,18 @@
+# cd hermes
+# cd firmware
+# make
+# cd ..\host
+# make
+# cd ..
+# fx2loader firmware/firmware.hex
+# host\Debug\host.exe
+> 01
+Writing:  01
+> 01
+Writing:  01
+> fe
+Writing:  FE
+> r
+Read 10 bytes from endpoint 2:  A9 A9 A9 A9 A9 A9 A9 A9 A9 A9
+> q
+#
