@@ -100,7 +100,7 @@ highspd_dscr_end:
 	.db    DSCR_INTERFACE_TYPE            ; bDescriptorType
 	.db    0                              ; bInterfaceNumber
 	.db    0                              ; bAlternateSetting
-	.db    2                              ; bNumEndpoints
+	.db    4                              ; bNumEndpoints
 	.db    0xff                           ; bInterfaceClass
 	.db    0x00                           ; bInterfaceSubClass
 	.db    0x00                           ; bInterfaceProtocol
@@ -124,28 +124,37 @@ highspd_dscr_end:
 ;	.db    0x00                           ; wMaxPacketSize MSB (0x0040 = 64 bytes)
 ;	.db    0x00                           ; bInterval
 
-; EP2IN
+; EP2OUT
 	.db    DSCR_ENDPOINT_LEN              ; bLength
 	.db    DSCR_ENDPOINT_TYPE             ; bDescriptorType
-	.db    0x82                           ; bEndpointAddress
+	.db    0x02                           ; bEndpointAddress
 	.db    ENDPOINT_TYPE_BULK             ; bmAttributes
 	.db    0x00                           ; wMaxPacketSize LSB
 	.db    0x02                           ; wMaxPacketSize MSB (0x0200 = 512 bytes)
 	.db    0x00                           ; bInterval
 
-; EP6IN
-;	.db    DSCR_ENDPOINT_LEN              ; bLength
-;	.db    DSCR_ENDPOINT_TYPE             ; bDescriptorType
-;	.db    0x86                           ; bEndpointAddress (0x86 = EP6IN)
-;	.db    ENDPOINT_TYPE_BULK             ; bmAttributes
-;	.db    0x00                           ; wMaxPacketSize LSB
-;	.db    0x02                           ; wMaxPacketSize MSB (0x0200 = 512 bytes)
-;	.db    0x00                           ; bInterval
+; EP4IN
+	.db    DSCR_ENDPOINT_LEN              ; bLength
+	.db    DSCR_ENDPOINT_TYPE             ; bDescriptorType
+	.db    0x84                           ; bEndpointAddress
+	.db    ENDPOINT_TYPE_BULK             ; bmAttributes
+	.db    0x00                           ; wMaxPacketSize LSB
+	.db    0x02                           ; wMaxPacketSize MSB (0x0200 = 512 bytes)
+	.db    0x00                           ; bInterval
 
 ; EP6OUT
 	.db    DSCR_ENDPOINT_LEN              ; bLength
 	.db    DSCR_ENDPOINT_TYPE             ; bDescriptorType
-	.db    0x06                           ; bEndpointAddress (0x06 = EP6OUT)
+	.db    0x06                           ; bEndpointAddress
+	.db    ENDPOINT_TYPE_BULK             ; bmAttributes
+	.db    0x00                           ; wMaxPacketSize LSB
+	.db    0x02                           ; wMaxPacketSize MSB (0x0200 = 512 bytes)
+	.db    0x00                           ; bInterval
+
+; EP8IN
+	.db    DSCR_ENDPOINT_LEN              ; bLength
+	.db    DSCR_ENDPOINT_TYPE             ; bDescriptorType
+	.db    0x88                           ; bEndpointAddress
 	.db    ENDPOINT_TYPE_BULK             ; bmAttributes
 	.db    0x00                           ; wMaxPacketSize LSB
 	.db    0x02                           ; wMaxPacketSize MSB (0x0200 = 512 bytes)

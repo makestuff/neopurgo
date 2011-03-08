@@ -63,8 +63,8 @@ architecture Behavioural of FX2FPGA is
 	signal wcount, wcount_next     : unsigned(3 downto 0);  -- Write count
 	signal checksum, checksum_next : unsigned(15 downto 0);
 	signal led, led_next           : std_logic_vector(7 downto 0);
-	constant IN_FIFO               : std_logic_vector(1 downto 0) := "00"; -- EP2IN
 	constant OUT_FIFO              : std_logic_vector(1 downto 0) := "10"; -- EP6OUT
+	constant IN_FIFO               : std_logic_vector(1 downto 0) := "11"; -- EP8IN
 begin
 	process(ifclk_in, reset_in)
 	begin

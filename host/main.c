@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
 	uint32 exitCode = 0;
 	int numErrors;
 	const int outEndpoint = 0x06;
-	const int inEndpoint = 0x02;
+	const int inEndpoint = 0x08;
 	FILE *inFile = NULL;
 	uint8 *buffer = NULL;
 	uint32 fileLen;
