@@ -32,6 +32,7 @@
     <property xil_pn:name="Constraints Entry" xil_pn:value="Constraints Editor"/>
     <property xil_pn:name="Device" xil_pn:value="xc3s200"/>
     <property xil_pn:name="Device Family" xil_pn:value="Spartan3"/>
+    <property xil_pn:name="Enable BitStream Compression" xil_pn:value="true"/>
     <property xil_pn:name="Fitter Report Format" xil_pn:value="HTML"/>
     <property xil_pn:name="Implementation Top" xil_pn:value="Architecture|FX2FPGA|Behavioural"/>
     <property xil_pn:name="Implementation Top Instance Path" xil_pn:value="/FX2FPGA"/>
