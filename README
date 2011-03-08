@@ -6,13 +6,19 @@
 # cd ..
 # fx2loader firmware/firmware.hex
 # host\Debug\host.exe
+Read 10 bytes from endpoint 8:  A9 A9 A9 A9 A9 A9 A9 A9 A9 A9
+# host\Debug\host.exe -i
 > 01
 Writing:  01
 > 01
 Writing:  01
-> fe
-Writing:  FE
-> r
-Read 10 bytes from endpoint 2:  A9 A9 A9 A9 A9 A9 A9 A9 A9 A9
+> x
+Read 16 bytes from endpoint 4:  48 45 4C 4C 4F 20 57 4F 52 4C 44 21 21 21 21 00
 > q
 #
+
+// Send 0x01 to FPGA each time the calc command is called:
+# ucm -v 0x04B4 -p 0x8613 -i 0x80 0x0010 0x0002 0x0008 | hxd
+
+// Scan the JTAG chain:
+# ucm -v 0x04B4 -p 0x8613 -i 0x90 0x0000 0x0000 0x0010 | hxd
