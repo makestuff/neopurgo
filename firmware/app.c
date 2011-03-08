@@ -21,6 +21,7 @@
 #include <delay.h>
 #include <i2c.h>
 #include <setupdat.h>
+#include <types.h>
 
 #define SYNCDELAY SYNCDELAY4;
 #define EP0BUF_SIZE 0x40
@@ -130,9 +131,45 @@ void main_init(void) {
 	OED = bmTDI | bmTMS | bmTCK;
 }
 
+uint16 checksum = 0;
+
 // Called repeatedly while the device is idle
 //
-void main_loop(void) { }
+void main_loop(void) {
+    if ( !(EP2468STAT & bmEP2EMPTY) ) {
+        // EP2 is not empty (host sent us a packet)
+        if  ( !(EP2468STAT & bmEP4FULL) ) {
+            // EP4 is not full (we can send host a packet)
+            uint16 numBytes = MAKEWORD(EP2BCH, EP2BCL);
+            uint16 i;
+            for ( i = 0; i < numBytes; i++ ) {
+                EP4FIFOBUF[i] = EP2FIFOBUF[i];
+                checksum += EP2FIFOBUF[i];
+            }
+            SYNCDELAY; EP4BCH = MSB(numBytes);  // Initiate send of the copied data
+            SYNCDELAY; EP4BCL = LSB(numBytes);
+            SYNCDELAY; OUTPKTEND = bmSKIP | 2;  // Acknowledge receipt of this packet
+        }
+    }
+}
+
+// Compose a packet to send on the EP6 FIFO, and commit it.
+//
+void fifo_send(void) {
+	SYNCDELAY; EP6FIFOCFG = 0x00;      // Disable AUTOOUT
+	SYNCDELAY; FIFORESET = bmNAKALL;   // NAK all OUT packets from host
+	SYNCDELAY; FIFORESET = 6;          // Advance EP6 buffers to CPU domain
+	
+	EP6FIFOBUF[0] = 0x01;              // Compose packet to send to EP6 FIFO
+	
+	SYNCDELAY; EP6BCH = 0;             // Commit newly-sourced packet to FIFO
+	SYNCDELAY; EP6BCL = 1;
+	
+	SYNCDELAY; OUTPKTEND = bmSKIP | 6; // Skip uncommitted second packet
+	
+	SYNCDELAY; FIFORESET = 0;          // Release "NAK all"
+	SYNCDELAY; EP6FIFOCFG = bmAUTOOUT; // Enable AUTOOUT again
+}
 
 // Called when a vendor command is received
 //
@@ -147,6 +184,8 @@ BOOL handle_vendorcommand(BYTE cmd) {
 		if ( SETUP_TYPE == 0xc0 ) {
 			const unsigned short *inArray = (unsigned short *)(SETUPDAT+2);
 			unsigned short *outArray = (unsigned short *)EP0BUF;
+
+			fifo_send();
 
 			// It's an IN operation
 			//

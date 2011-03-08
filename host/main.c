@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <stdio.h>
+#include <string.h>
 #include "usbwrap.h"
 #include "argtable2.h"
 #include "arg_uint.h"
@@ -182,7 +184,22 @@ int main(int argc, char *argv[]) {
 			} else if ( *linePtr == 'q' ) {
 				break;
 			} else if ( *linePtr == 'x' ) {
-				usb_clear_halt(deviceHandle, USB_ENDPOINT_IN | inEndpoint);
+				strcpy(byteBuf, "HELLO WORLD!!!!");
+				returnCode = usb_bulk_write(
+					deviceHandle, USB_ENDPOINT_OUT | 2, (char*)byteBuf, 16, 1000);
+				if ( returnCode != 16 ) {
+					printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
+					continue;
+				}
+				returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, 16, 1000);
+				if ( returnCode > 0 ) {
+					printf("Read %d bytes from endpoint 4: ", returnCode, inEndpoint);
+					dumpSimple(byteBuf, returnCode);
+					printf("\n");
+				} else if ( returnCode < 0 ) {
+					printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
+					continue;
+				}
 			} else if ( *linePtr == 'r' ) {
 				returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
 				if ( returnCode > 0 ) {
