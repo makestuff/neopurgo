@@ -39,6 +39,7 @@
     <property xil_pn:name="Synthesis Tool" xil_pn:value="XST (VHDL/Verilog)"/>
     <property xil_pn:name="Top-Level Source Type" xil_pn:value="HDL"/>
     <property xil_pn:name="Verbose Property Persistence" xil_pn:value="false"/>
+    <property xil_pn:name="iMPACT Project File" xil_pn:value="auto_project.ipf"/>
   </properties>
 
   <bindings/>
