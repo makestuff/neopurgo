@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <string.h>
 #include "usbwrap.h"
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
 	//uint32 i;
 	char lineBuf[1026];
 	char *linePtr;
-	uint8 byteBuf[512];
+	uint8 byteBuf[513];
 	uint8 *bytePtr;
 	int byteCount;
 	uint8 highNibble, lowNibble;
@@ -184,22 +185,46 @@ int main(int argc, char *argv[]) {
 			} else if ( *linePtr == 'q' ) {
 				break;
 			} else if ( *linePtr == 'x' ) {
-				strcpy(byteBuf, "HELLO WORLD!!!!");
-				returnCode = usb_bulk_write(
-					deviceHandle, USB_ENDPOINT_OUT | 2, (char*)byteBuf, 16, 1000);
-				if ( returnCode != 16 ) {
-					printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
+				const char *text = "Nor have we been wanting in attention to our British brethren. We have warned them from time to time of attempts by their legislature to extend an unwarrantable jurisdiction over us. We have reminded them of the circumstances of our emigration and settlement here. We have appealed to their native justice and magnanimity, and we have conjured them by the ties of our common kindred to disavow these usurpations, which, would inevitably interrupt our connections and correspondence. They too have been deaf to the voice of justice and of consanguinity. We must, therefore, acquiesce in the necessity, which denounces our separation, and hold them, as we hold the rest of mankind, enemies in war, in peace friends.";
+				const char *ptr = text;
+				uint32 numBytes = strlen(text);
+				uint16 chunkSize;
+				*((uint32 *)byteBuf) = numBytes;
+				returnCode = usb_control_msg(
+					deviceHandle,
+					USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+					0x80, 0x00FF, 0x0000, byteBuf, 4, 5000
+				);
+				if ( returnCode != 4 ) {
+					printf("Error whilst sending control message: %s\n", usb_strerror());
 					continue;
 				}
-				returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, 16, 1000);
-				if ( returnCode > 0 ) {
-					printf("Read %d bytes from endpoint 4: ", returnCode, inEndpoint);
-					dumpSimple(byteBuf, returnCode);
-					printf("\n");
-				} else if ( returnCode < 0 ) {
-					printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
-					continue;
-				}
+
+				do {
+					chunkSize = (numBytes>=512) ? 512 : (uint16)numBytes;
+					strncpy(byteBuf, ptr, chunkSize);
+					ptr += chunkSize;
+					numBytes -= chunkSize;
+					returnCode = usb_bulk_write(
+						deviceHandle, USB_ENDPOINT_OUT | 2, (char*)byteBuf, chunkSize, 1000);
+					if ( returnCode != chunkSize ) {
+						printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
+						continue;
+					}
+					byteBuf[chunkSize] = 0x00;
+					printf("Wrote %d bytes to endpoint 2: \"%s\"\n", chunkSize, byteBuf);
+					returnCode = usb_bulk_read(
+						deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, chunkSize, 1000);
+					if ( returnCode != chunkSize ) {
+						printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
+						continue;
+					}
+					byteBuf[chunkSize] = 0x00;
+					printf("Read %d bytes from endpoint 4: \"%s\"\n", returnCode, byteBuf);
+					//printf("Read %d bytes from endpoint 4: ", returnCode);
+					//dumpSimple(byteBuf, returnCode);
+					//printf("\n");
+				} while ( numBytes );
 			} else if ( *linePtr == 'r' ) {
 				returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
 				if ( returnCode > 0 ) {

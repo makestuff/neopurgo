@@ -140,54 +140,56 @@ void main_init(void) {
 	OED = bmTDI | bmTMS | bmTCK;
 }
 
-uint16 checksum = 0;
+uint32 numBytes = 0UL;
+uint8 flags = 0x00;
 
 // Called repeatedly while the device is idle
 //
 void main_loop(void) {
-    if ( !(EP2468STAT & bmEP2EMPTY) ) {
-        // EP2 is not empty (host sent us a packet)
-        if  ( !(EP2468STAT & bmEP4FULL) ) {
-            // EP4 is not full (we can send host a packet)
-            uint16 numBytes = MAKEWORD(EP2BCH, EP2BCL);
-            uint16 i;
-            for ( i = 0; i < numBytes; i++ ) {
-                EP4FIFOBUF[i] = EP2FIFOBUF[i];
-                checksum += EP2FIFOBUF[i];
-            }
-            SYNCDELAY; EP4BCH = MSB(numBytes);  // Initiate send of the copied data
-            SYNCDELAY; EP4BCL = LSB(numBytes);
-            SYNCDELAY; OUTPKTEND = bmSKIP | 2;  // Acknowledge receipt of this packet
-        }
-    }
+	uint16 chunkSize, i;
+	while ( numBytes ) {
+		while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
+		while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
+		chunkSize = MAKEWORD(EP2BCH, EP2BCL);
+		for ( i = 0; i < chunkSize; i++ ) {
+			if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
+				EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
+			} else {
+				EP4FIFOBUF[i] = EP2FIFOBUF[i];
+			}
+		}
+		SYNCDELAY; EP4BCH = MSB(chunkSize);  // Initiate send of the copied data
+		SYNCDELAY; EP4BCL = LSB(chunkSize);
+		SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
+		numBytes -= chunkSize;
+	}
 }
-
-uint32 numBits;
 
 // Called when a vendor command is received
 //
 bool handle_vendorcommand(uint8 cmd) {
 	uint16 address, length;
-	uint8 i, j, chunkSize;
+	uint8 i, j;
 	switch(cmd) {
+		// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
+		//
 		case CMD_CLOCK_DATA:
-			// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
-			if ( SETUP_TYPE == REQDIR_HOSTTODEVICE | REQTYPE_VENDOR ) {
-				// OUT operation
-				uint16 wValue = SETUP_VALUE();
-				EP0BCL = 0x00; // allow pc transfer in
-				while ( EP0CS & bmEPBUSY ); // wait for data
-				chunkSize = EP0BCL;  // should be four - is a check necessary?
-				numBits = *((uint32 *)EP0BUF);
+			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+				uint16 chunkSize;
+				flags = SETUPDAT[2];             // Remember flag byte
+				EP0BCL = 0x00;                   // Allow host transfer in
+				while ( EP0CS & bmEPBUSY );      // Wait for data
+				numBytes = *((uint32 *)EP0BUF);  // Remember length
+				// This operation continues in main_loop()...
 			} else {
 				// Unrecognised operation
 				return false;
 			}
 
-
+		// Simple JTAG scan-chain operation
+		//
 		case 0x90:
-			// Simple JTAG scan-chain operation
-			if ( SETUP_TYPE == REQDIR_DEVICETOHOST | REQTYPE_VENDOR ) {
+			if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 				const uint16 *inArray = (uint16 *)(SETUPDAT+2);
 				uint32 *outArray = (uint32 *)EP0BUF, *ptr = outArray;
 				uint32 thisID;
@@ -229,11 +231,11 @@ bool handle_vendorcommand(uint8 cmd) {
 			}
 			break;
 
+	// Simple example command which does the four arithmetic operations on the data from
+	// the host, and sends the results back to the host
+	//
 	case 0x91:
-		// Simple example command which does the four arithmetic operations on the data from
-		// the host, and sends the results back to the host
-		//
-		if ( SETUP_TYPE == REQDIR_DEVICETOHOST | REQTYPE_VENDOR ) {
+		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			uint16 num1 = SETUP_VALUE();
 			uint16 num2 = SETUP_INDEX();
 			uint16 *outArray = (uint16 *)EP0BUF;
@@ -256,9 +258,9 @@ bool handle_vendorcommand(uint8 cmd) {
 		}
 		break;
 
+	// Command to talk to the EEPROM
+	//
 	case 0xa2:
-		// Command to talk to the EEPROM
-		//
 		I2CTL |= bm400KHZ;
 		address = SETUP_VALUE();
 		length = SETUP_LENGTH();
