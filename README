@@ -17,8 +17,8 @@ Read 16 bytes from endpoint 4:  48 45 4C 4C 4F 20 57 4F 52 4C 44 21 21 21 21 00
 > q
 #
 
-// Send 0x01 to FPGA each time the calc command is called:
-# ucm -v 0x04B4 -p 0x8613 -i 0x80 0x0010 0x0002 0x0008 | hxd
-
 // Scan the JTAG chain:
 # ucm -v 0x04B4 -p 0x8613 -i 0x90 0x0000 0x0000 0x0010 | hxd
+
+// Send 0x01 to FPGA each time the calc command is called:
+# ucm -v 0x04B4 -p 0x8613 -i 0x91 0x0010 0x0002 0x0008 | hxd

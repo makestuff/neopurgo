@@ -42,8 +42,17 @@
 #define bmDYN_OUT (1<<1)
 #define bmENH_PKT (1<<0)
 
-BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf);
-BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf);
+// USB command macros, copied from Dean Camera's LUFA package
+#define REQDIR_DEVICETOHOST (1 << 7)
+#define REQDIR_HOSTTODEVICE (0 << 7)
+#define REQTYPE_CLASS       (1 << 5)
+#define REQTYPE_STANDARD    (0 << 5)
+#define REQTYPE_VENDOR      (2 << 5)
+
+// Function declarations
+bool promRead(uint16 addr, uint8 length, uint8 xdata *buf);
+bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf);
+void fifo_send(void);
 
 // The minimum number of bytes necessary to store this many bits
 #define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
@@ -153,62 +162,35 @@ void main_loop(void) {
     }
 }
 
-// Compose a packet to send on the EP6 FIFO, and commit it.
-//
-void fifo_send(void) {
-	SYNCDELAY; EP6FIFOCFG = 0x00;      // Disable AUTOOUT
-	SYNCDELAY; FIFORESET = bmNAKALL;   // NAK all OUT packets from host
-	SYNCDELAY; FIFORESET = 6;          // Advance EP6 buffers to CPU domain
-	
-	EP6FIFOBUF[0] = 0x01;              // Compose packet to send to EP6 FIFO
-	
-	SYNCDELAY; EP6BCH = 0;             // Commit newly-sourced packet to FIFO
-	SYNCDELAY; EP6BCL = 1;
-	
-	SYNCDELAY; OUTPKTEND = bmSKIP | 6; // Skip uncommitted second packet
-	
-	SYNCDELAY; FIFORESET = 0;          // Release "NAK all"
-	SYNCDELAY; EP6FIFOCFG = bmAUTOOUT; // Enable AUTOOUT again
-}
+uint32 numBits;
 
 // Called when a vendor command is received
 //
-BOOL handle_vendorcommand(BYTE cmd) {
-	WORD address, length;
-	BYTE i, j, chunkSize;
+bool handle_vendorcommand(uint8 cmd) {
+	uint16 address, length;
+	uint8 i, j, chunkSize;
 	switch(cmd) {
-	case 0x80:
-		// Simple example command which does the four arithmetic operations on the data from
-		// the host, and sends the results back to the host
-		//
-		if ( SETUP_TYPE == 0xc0 ) {
-			const unsigned short *inArray = (unsigned short *)(SETUPDAT+2);
-			unsigned short *outArray = (unsigned short *)EP0BUF;
+		case CMD_CLOCK_DATA:
+			// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
+			if ( SETUP_TYPE == REQDIR_HOSTTODEVICE | REQTYPE_VENDOR ) {
+				// OUT operation
+				uint16 wValue = SETUP_VALUE();
+				EP0BCL = 0x00; // allow pc transfer in
+				while ( EP0CS & bmEPBUSY ); // wait for data
+				chunkSize = EP0BCL;  // should be four - is a check necessary?
+				numBits = *((uint32 *)EP0BUF);
+			} else {
+				// Unrecognised operation
+				return false;
+			}
 
-			fifo_send();
 
-			// It's an IN operation
-			//
-			while ( EP0CS & bmEPBUSY );
-			outArray[0] = inArray[0] + inArray[1];
-			outArray[1] = inArray[0] - inArray[1];
-			outArray[2] = inArray[0] * inArray[1];
-			outArray[3] = inArray[0] / inArray[1];
-			EP0BCH = 0;
-			SYNCDELAY;
-			EP0BCL = 8;
-		} else {
-			// This command does not support OUT operations
-			//
-			return FALSE;
-		}
-		break;
-		
 		case 0x90:
-			if ( SETUP_TYPE == 0xc0 ) {
-				const unsigned short *inArray = (unsigned short *)(SETUPDAT+2);
-				unsigned long *outArray = (unsigned long *)EP0BUF, *ptr = outArray;
-				unsigned long thisID;
+			// Simple JTAG scan-chain operation
+			if ( SETUP_TYPE == REQDIR_DEVICETOHOST | REQTYPE_VENDOR ) {
+				const uint16 *inArray = (uint16 *)(SETUPDAT+2);
+				uint32 *outArray = (uint32 *)EP0BUF, *ptr = outArray;
+				uint32 thisID;
 				
 				// Go to Test-Logic-Reset
 				IOD = bmTMS;
@@ -243,19 +225,44 @@ BOOL handle_vendorcommand(BYTE cmd) {
 			} else {
 				// This command does not support OUT operations
 				//
-				return FALSE;
+				return false;
 			}
 			break;
+
+	case 0x91:
+		// Simple example command which does the four arithmetic operations on the data from
+		// the host, and sends the results back to the host
+		//
+		if ( SETUP_TYPE == REQDIR_DEVICETOHOST | REQTYPE_VENDOR ) {
+			uint16 num1 = SETUP_VALUE();
+			uint16 num2 = SETUP_INDEX();
+			uint16 *outArray = (uint16 *)EP0BUF;
+
+			fifo_send();
+
+			// It's an IN operation - prepare the response and send it
+			while ( EP0CS & bmEPBUSY );
+			outArray[0] = num1 + num2;
+			outArray[1] = num1 - num2;
+			outArray[2] = num1 * num2;
+			outArray[3] = num1 / num2;
+			EP0BCH = 0;
+			SYNCDELAY;
+			EP0BCL = 8;
+		} else {
+			// This command does not support OUT operations
+			//
+			return false;
+		}
+		break;
 
 	case 0xa2:
 		// Command to talk to the EEPROM
 		//
 		I2CTL |= bm400KHZ;
-		address = SETUPDAT[2];
-		address |= SETUPDAT[3] << 8;
-		length = SETUPDAT[6];
-		length |= SETUPDAT[7] << 8;
-		if ( SETUP_TYPE == 0xc0 ) {
+		address = SETUP_VALUE();
+		length = SETUP_LENGTH();
+		if ( SETUP_TYPE == REQDIR_DEVICETOHOST | REQTYPE_VENDOR ) {
 			// It's an IN operation - read from prom and send to host
 			//
 			while ( length ) {
@@ -271,7 +278,7 @@ BOOL handle_vendorcommand(BYTE cmd) {
 				address += chunkSize;
 				length -= chunkSize;
 			}
-		} else if ( SETUP_TYPE == 0x40 ) {
+		} else if ( SETUP_TYPE == REQDIR_HOSTTODEVICE | REQTYPE_VENDOR ) {
 			// It's an OUT operation - read from host and send to prom
 			//
 			while ( length ) {
@@ -284,40 +291,48 @@ BOOL handle_vendorcommand(BYTE cmd) {
 			}
 		}
 		else {
-			return FALSE;
+			return false;
 		}
 		break;
 	default:
-		return FALSE;  // unrecognised command
+		return false;  // unrecognised command
 	}
-	return TRUE;
+	return true;
 }
 
-BOOL promWaitForDone() {
-	BYTE i;
-	while ( !((i = I2CS) & 1) );  // Poll the done bit
+// Wait for the I2C interface to complete the current send or receive operation. Return true if
+// there was a bus error, else return false if the operation completed successfully.
+//
+bool promWaitForDone() {
+	uint8 i;
+	while ( !((i = I2CS) & bmDONE) );  // Poll the done bit
 	if ( i & bmBERR ) {
-		return 1;
+		return true;
 	} else {
-		return 0;
+		return false;
 	}
 }	
 
-BOOL promWaitForAck()
-{
-	BYTE i;
-	while ( !((i = I2CS) & 1) );  // Poll the done bit
+// Wait for the I2C interface to complete the current send operation. Return true if there was a
+// bus error or the slave failed to acknowledge receipt of the byte, else return false if the
+// operation completed successfully.
+//
+bool promWaitForAck() {
+	uint8 i;
+	while ( !((i = I2CS) & bmDONE) );  // Poll the done bit
 	if ( i & bmBERR ) {
-		return 1;
+		return true;
 	} else if ( !(i & bmACK) ) {
-		return 1;
+		return true;
 	} else {
-		return 0;
+		return false;
 	}
 }
 
-BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf) {
-	BYTE i;
+// Read "length" bytes from address "addr" in the attached EEPROM, and write them to RAM at "buf".
+//
+bool promRead(uint16 addr, uint8 length, uint8 xdata *buf) {
+	uint8 i;
 	
 	// Wait for I2C idle
 	//
@@ -328,18 +343,18 @@ BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf) {
 	I2CS = bmSTART;
 	I2DAT = 0xA2;  // Write I2C address byte (WRITE)
 	if ( promWaitForAck() ) {
-		return 1;
+		return true;
 	}
 	
 	// Send the address, MSB first
 	//
 	I2DAT = MSB(addr);  // Write MSB of address
 	if ( promWaitForAck() ) {
-		return 1;
+		return true;
 	}
 	I2DAT = LSB(addr);  // Write LSB of address
 	if ( promWaitForAck() ) {
-		return 1;
+		return true;
 	}
 
 	// Send the READ command
@@ -347,22 +362,22 @@ BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf) {
 	I2CS = bmSTART;
 	I2DAT = 0xA3;  // Write I2C address byte (READ)
 	if ( promWaitForDone() ) {
-		return 1;
+		return true;
 	}
 
 	// Read dummy byte
 	//
 	i = I2DAT;
 	if ( promWaitForDone() ) {
-		return 1;
+		return true;
 	}
 
 	// Now get the actual data
 	//
 	for ( i = 0; i < (length-1); i++ ) {
-		*(buf+i) = I2DAT;
+		buf[i] = I2DAT;
 		if ( promWaitForDone() ) {
-			return 1;
+			return true;
 		}
 	}
 
@@ -370,20 +385,22 @@ BOOL promRead(WORD addr, BYTE length, BYTE xdata *buf) {
 	//
 	I2CS = bmLASTRD;
 	if ( promWaitForDone() ) {
-		return 1;
+		return true;
 	}
-	*(buf+i) = I2DAT;
+	buf[i] = I2DAT;
 	if ( promWaitForDone() ) {
-		return 1;
+		return true;
 	}
 	I2CS = bmSTOP;
 	i = I2DAT;
 
-	return 0;
+	return false;
 }
 
-BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf) {
-	BYTE i;
+// Read "length" bytes from RAM at "buf", and write them to the attached EEPROM at address "addr".
+//
+bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf) {
+	uint8 i;
 
 	// Wait for I2C idle
 	//
@@ -394,28 +411,28 @@ BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf) {
 	I2CS = bmSTART;
 	I2DAT = 0xA2;  // Write I2C address byte (WRITE)
 	if ( promWaitForAck() ) {
-		return 1;
+		return true;
 	}
 
 	// Send the address, MSB first
 	//
 	I2DAT = MSB(addr);  // Write MSB of address
 	if ( promWaitForAck() ) {
-		return 1;
+		return true;
 	}
 	I2DAT = LSB(addr);  // Write LSB of address
 	if ( promWaitForAck() ) {
-		return 1;
+		return true;
 	}
 
 	// Write the data
 	//
 	for ( i = 0; i < length; i++ ) {
-        I2DAT = *buf++;
+		I2DAT = *buf++;
 		if ( promWaitForDone() ) {
-			return 1;
+			return true;
 		}
-    }
+	}
 	I2CS |= bmSTOP;
 
 	// Wait for I2C idle
@@ -424,44 +441,61 @@ BOOL promWrite(WORD addr, BYTE length, const BYTE xdata *buf) {
 
 	do {
 		I2CS = bmSTART;
-		I2DAT = 0xA2;  // Write I2C address byte (WRITE)                                                                                                                                                                
+		I2DAT = 0xA2;  // Write I2C address byte (WRITE)
 		if ( promWaitForDone() ) {
-			return 1;
+			return true;
 		}
 		I2CS |= bmSTOP;
 		while ( I2CS & bmSTOP );
 	} while ( !(I2CS & bmACK) );
 	
-	return 0;
+	return false;
 }
 
-BYTE currentConfiguration;  // Current configuration
-BYTE alternateSetting = 0;  // Alternate settings
+// Compose a packet to send on the EP6 FIFO, and commit it.
+//
+void fifo_send(void) {
+	SYNCDELAY; EP6FIFOCFG = 0x00;      // Disable AUTOOUT
+	SYNCDELAY; FIFORESET = bmNAKALL;   // NAK all OUT packets from host
+	SYNCDELAY; FIFORESET = 6;          // Advance EP6 buffers to CPU domain
+	
+	EP6FIFOBUF[0] = 0x01;              // Compose packet to send to EP6 FIFO
+	
+	SYNCDELAY; EP6BCH = 0;             // Commit newly-sourced packet to FIFO
+	SYNCDELAY; EP6BCL = 1;
+	
+	SYNCDELAY; OUTPKTEND = bmSKIP | 6; // Skip uncommitted second packet
+	
+	SYNCDELAY; FIFORESET = 0;          // Release "NAK all"
+	SYNCDELAY; EP6FIFOCFG = bmAUTOOUT; // Enable AUTOOUT again
+}
+
+uint8 currentConfiguration;  // Current configuration
+uint8 alternateSetting = 0;  // Alternate settings
 
 // Called when a Set Configuration command is received
 //
-BOOL handle_set_configuration(BYTE cfg) {
+bool handle_set_configuration(uint8 cfg) {
 	currentConfiguration = cfg;
-	return(TRUE);  // Handled by user code
+	return(true);  // Handled by user code
 }
 
 // Called when a Get Configuration command is received
 //
-BYTE handle_get_configuration()
-{
+uint8 handle_get_configuration() {
 	return currentConfiguration;
 }
 
 // Called when a Get Interface command is received
 //
-BOOL handle_get_interface(BYTE ifc, BYTE *alt) {
+bool handle_get_interface(uint8 ifc, uint8 *alt) {
 	*alt = alternateSetting;
-	return TRUE;
+	return true;
 }
 
 // Called when a Set Interface command is received
 //
-BOOL handle_set_interface(BYTE ifc, BYTE alt) {
+bool handle_set_interface(uint8 ifc, uint8 alt) {
 	alternateSetting = alt;
-	return TRUE;
+	return true;
 }
