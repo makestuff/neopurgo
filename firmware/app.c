@@ -262,7 +262,7 @@ bool handle_vendorcommand(uint8 cmd) {
 		I2CTL |= bm400KHZ;
 		address = SETUP_VALUE();
 		length = SETUP_LENGTH();
-		if ( SETUP_TYPE == REQDIR_DEVICETOHOST | REQTYPE_VENDOR ) {
+		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			// It's an IN operation - read from prom and send to host
 			//
 			while ( length ) {
@@ -278,7 +278,7 @@ bool handle_vendorcommand(uint8 cmd) {
 				address += chunkSize;
 				length -= chunkSize;
 			}
-		} else if ( SETUP_TYPE == REQDIR_HOSTTODEVICE | REQTYPE_VENDOR ) {
+		} else if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 			// It's an OUT operation - read from host and send to prom
 			//
 			while ( length ) {
