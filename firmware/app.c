@@ -70,18 +70,12 @@ sbit at 0xB4      TCK; /* Port D.4 */
 #define bmTMS     bmBIT3
 #define bmTCK     bmBIT4
 
-enum SendType {
-	SEND_ZEROS,
-	SEND_ONES,
-	SEND_DATA,
-	SEND_MASK
-};
-
-enum {
-	IS_RESPONSE_NEEDED = 0,
-	IS_LAST = 1,
-	SEND_TYPE = 2
-};
+#define bmNEEDRESPONSE (1<<0)
+#define bmISLAST       (1<<1)
+#define bmSENDZEROS    (0<<2)
+#define bmSENDONES     (1<<2)
+#define bmSENDDATA     (2<<2)
+#define bmSENDMASK     (3<<2)
 
 enum {
 	CMD_CLOCK_DATA = 0x80,
@@ -141,27 +135,59 @@ void main_init(void) {
 }
 
 uint32 numBytes = 0UL;
-uint8 flags = 0x00;
+uint8 flagByte = 0x00;
 
 // Called repeatedly while the device is idle
 //
 void main_loop(void) {
 	uint16 chunkSize, i;
-	while ( numBytes ) {
-		while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-		while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-		chunkSize = MAKEWORD(EP2BCH, EP2BCL);
-		for ( i = 0; i < chunkSize; i++ ) {
-			if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
-				EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
+	if ( numBytes ) {
+		if ( (flagByte & bmSENDMASK) == bmSENDDATA ) {
+			if ( flagByte & bmNEEDRESPONSE ) {
+				// The host is giving us data, and is expecting a response (xdr)
+				while ( numBytes ) {
+					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
+					chunkSize = MAKEWORD(EP2BCH, EP2BCL);
+					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
+					for ( i = 0; i < chunkSize; i++ ) {
+						if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
+							EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
+						} else {
+							EP4FIFOBUF[i] = EP2FIFOBUF[i];
+						}
+					}
+					SYNCDELAY; EP4BCH = MSB(chunkSize);  // Initiate send of the copied data
+					SYNCDELAY; EP4BCL = LSB(chunkSize);
+					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
+					numBytes -= chunkSize;
+				}
 			} else {
-				EP4FIFOBUF[i] = EP2FIFOBUF[i];
+				// The host is giving us data, but does not need a response (xdn)
+				while ( numBytes ) {
+					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
+					chunkSize = MAKEWORD(EP2BCH, EP2BCL);
+					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
+					numBytes -= chunkSize;
+				}
+			}
+		} else {
+			if ( flagByte & bmNEEDRESPONSE ) {
+				// The host is not giving us data, but is expecting a response (x0r)
+				while ( numBytes ) {
+					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
+					chunkSize = (numBytes > 512) ? 512 : (uint16)numBytes;
+					for ( i = 0; i < chunkSize; i++ ) {
+						EP4FIFOBUF[i] = 0xAA;
+					}
+					SYNCDELAY; EP4BCH = MSB(chunkSize);  // Initiate send of the copied data
+					SYNCDELAY; EP4BCL = LSB(chunkSize);
+					numBytes -= chunkSize;
+				}
+			} else {
+				// The host is not giving us data, and does not need a response (x0n)
+				numBytes = 0UL;
 			}
 		}
-		SYNCDELAY; EP4BCH = MSB(chunkSize);  // Initiate send of the copied data
-		SYNCDELAY; EP4BCL = LSB(chunkSize);
-		SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-		numBytes -= chunkSize;
 	}
 }
 
@@ -176,7 +202,7 @@ bool handle_vendorcommand(uint8 cmd) {
 		case CMD_CLOCK_DATA:
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 				uint16 chunkSize;
-				flags = SETUPDAT[2];             // Remember flag byte
+				flagByte = SETUPDAT[2];          // Remember flag byte
 				EP0BCL = 0x00;                   // Allow host transfer in
 				while ( EP0CS & bmEPBUSY );      // Wait for data
 				numBytes = *((uint32 *)EP0BUF);  // Remember length

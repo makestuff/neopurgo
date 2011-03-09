@@ -93,6 +93,14 @@ void dumpSimple(const unsigned char *input, unsigned int length) {
 }
 */
 
+
+#define bmNEEDRESPONSE (1<<0)
+#define bmISLAST       (1<<1)
+#define bmSENDZEROS    (0<<2)
+#define bmSENDONES     (1<<2)
+#define bmSENDDATA     (2<<2)
+#define bmSENDMASK     (3<<2)
+
 int main(int argc, char *argv[]) {
 
 	struct arg_uint *vidOpt  = arg_uint0("v", "vid", "<vendorID>", "  vendor ID");
@@ -185,46 +193,107 @@ int main(int argc, char *argv[]) {
 			} else if ( *linePtr == 'q' ) {
 				break;
 			} else if ( *linePtr == 'x' ) {
-				const char *text = "Nor have we been wanting in attention to our British brethren. We have warned them from time to time of attempts by their legislature to extend an unwarrantable jurisdiction over us. We have reminded them of the circumstances of our emigration and settlement here. We have appealed to their native justice and magnanimity, and we have conjured them by the ties of our common kindred to disavow these usurpations, which, would inevitably interrupt our connections and correspondence. They too have been deaf to the voice of justice and of consanguinity. We must, therefore, acquiesce in the necessity, which denounces our separation, and hold them, as we hold the rest of mankind, enemies in war, in peace friends.";
-				const char *ptr = text;
-				uint32 numBytes = strlen(text);
-				uint16 chunkSize;
-				*((uint32 *)byteBuf) = numBytes;
-				returnCode = usb_control_msg(
-					deviceHandle,
-					USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-					0x80, 0x00FF, 0x0000, byteBuf, 4, 5000
-				);
-				if ( returnCode != 4 ) {
-					printf("Error whilst sending control message: %s\n", usb_strerror());
-					continue;
+				if ( linePtr[1] == 'd' ) {
+					// -----------------------------------------------------
+					// Need to send data
+					const char *text = "Nor have we been wanting in attention to our British brethren. We have warned them from time to time of attempts by their legislature to extend an unwarrantable jurisdiction over us. We have reminded them of the circumstances of our emigration and settlement here. We have appealed to their native justice and magnanimity, and we have conjured them by the ties of our common kindred to disavow these usurpations, which, would inevitably interrupt our connections and correspondence. They too have been deaf to the voice of justice and of consanguinity. We must, therefore, acquiesce in the necessity, which denounces our separation, and hold them, as we hold the rest of mankind, enemies in war, in peace friends.";
+					const char *ptr = text;
+					uint32 numBytes = strlen(text);
+					uint16 chunkSize;
+					*((uint32 *)byteBuf) = numBytes;
+					if ( linePtr[2] == 'r' ) {
+						// Need to send data, and need a response
+						returnCode = usb_control_msg(
+							deviceHandle,
+							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+							0x80, (bmSENDDATA | bmNEEDRESPONSE), 0x0000, byteBuf, 4, 5000
+						);
+						if ( returnCode != 4 ) {
+							printf("Error whilst sending control message: %s\n", usb_strerror());
+							continue;
+						}
+		
+						do {
+							chunkSize = (numBytes>=512) ? 512 : (uint16)numBytes;
+							strncpy(byteBuf, ptr, chunkSize);
+							ptr += chunkSize;
+							numBytes -= chunkSize;
+							returnCode = usb_bulk_write(
+								deviceHandle, USB_ENDPOINT_OUT | 2, (char*)byteBuf, chunkSize, 1000);
+							if ( returnCode != chunkSize ) {
+								printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
+								continue;
+							}
+							byteBuf[chunkSize] = 0x00;
+							printf("Wrote %d bytes to endpoint 2: \"%s\"\n", chunkSize, byteBuf);
+							returnCode = usb_bulk_read(
+								deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, chunkSize, 1000);
+							if ( returnCode != chunkSize ) {
+								printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
+								continue;
+							}
+							byteBuf[chunkSize] = 0x00;
+							printf("Read %d bytes from endpoint 4: \"%s\"\n", returnCode, byteBuf);
+							//printf("Read %d bytes from endpoint 4: ", returnCode);
+							//dumpSimple(byteBuf, returnCode);
+							//printf("\n");
+						} while ( numBytes );
+					} else {
+						// Need to send data, but no response is needed
+						returnCode = usb_control_msg(
+							deviceHandle,
+							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+							0x80, bmSENDDATA, 0x0000, byteBuf, 4, 5000
+						);
+						if ( returnCode != 4 ) {
+							printf("Error whilst sending control message: %s\n", usb_strerror());
+							continue;
+						}
+						returnCode = usb_bulk_write(
+							deviceHandle, USB_ENDPOINT_OUT | 2, (char*)text, numBytes, 1000);
+						if ( returnCode != numBytes ) {
+							printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
+							continue;
+						}
+						printf("Wrote %d bytes to endpoint 2: \"%s\"\n", numBytes, text);
+					}
+				} else {
+					// -----------------------------------------------------
+					// Not sending
+					*((uint32 *)byteBuf) = 400;
+					if ( linePtr[2] == 'r' ) {
+						// Not sending data, but a response is needed
+						returnCode = usb_control_msg(
+							deviceHandle,
+							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+							0x80, (bmSENDZEROS | bmNEEDRESPONSE), 0x0000, byteBuf, 4, 5000
+						);
+						if ( returnCode != 4 ) {
+							printf("Error whilst sending control message: %s\n", usb_strerror());
+							continue;
+						}
+						returnCode = usb_bulk_read(
+							deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, 400, 1000);
+						if ( returnCode != 400 ) {
+							printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
+							continue;
+						}
+						printf("Read %d bytes from endpoint 4: ", returnCode);
+						dumpSimple(byteBuf, returnCode);
+						printf("\n");
+					} else {
+						// Not sending data, no response is needed
+						returnCode = usb_control_msg(
+							deviceHandle,
+							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+							0x80, bmSENDZEROS, 0x0000, byteBuf, 4, 5000
+						);
+						if ( returnCode != 4 ) {
+							printf("Error whilst sending control message: %s\n", usb_strerror());
+							continue;
+						}
+					}
 				}
-
-				do {
-					chunkSize = (numBytes>=512) ? 512 : (uint16)numBytes;
-					strncpy(byteBuf, ptr, chunkSize);
-					ptr += chunkSize;
-					numBytes -= chunkSize;
-					returnCode = usb_bulk_write(
-						deviceHandle, USB_ENDPOINT_OUT | 2, (char*)byteBuf, chunkSize, 1000);
-					if ( returnCode != chunkSize ) {
-						printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
-						continue;
-					}
-					byteBuf[chunkSize] = 0x00;
-					printf("Wrote %d bytes to endpoint 2: \"%s\"\n", chunkSize, byteBuf);
-					returnCode = usb_bulk_read(
-						deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, chunkSize, 1000);
-					if ( returnCode != chunkSize ) {
-						printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
-						continue;
-					}
-					byteBuf[chunkSize] = 0x00;
-					printf("Read %d bytes from endpoint 4: \"%s\"\n", returnCode, byteBuf);
-					//printf("Read %d bytes from endpoint 4: ", returnCode);
-					//dumpSimple(byteBuf, returnCode);
-					//printf("\n");
-				} while ( numBytes );
 			} else if ( *linePtr == 'r' ) {
 				returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
 				if ( returnCode > 0 ) {
