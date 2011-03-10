@@ -151,11 +151,11 @@ void main_init(void) {
 // Called repeatedly while the device is idle
 //
 void main_loop(void) {
-	uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
 	if ( numBits ) {
 		if ( (flagByte & bmSENDMASK) == bmSENDDATA ) {
 			if ( flagByte & bmNEEDRESPONSE ) {
 				// The host is giving us data, and is expecting a response (xdr)
+				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
 				uint8 *inPtr, *outPtr;
 				while ( numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
@@ -212,6 +212,7 @@ void main_loop(void) {
 				}
 			} else {
 				// The host is giving us data, but does not need a response (xdn)
+				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
 				uint16 i;
 				while ( numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
@@ -222,6 +223,38 @@ void main_loop(void) {
 						numBits = 0UL;
 						break;
 					}
+
+					inPtr = EP2FIFOBUF;
+					if ( bitsRead == numBits ) {
+						// This is the last chunk
+						uint8 tdiByte, leftOver, i;
+						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
+						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
+						bytesRemaining = (bitsRemaining>>3);
+						while ( bytesRemaining-- ) {
+							shiftOut(*inPtr++);
+						}
+						tdiByte = *inPtr++;  // Now do the bits in the final byte
+						i = 1;
+						while ( i && leftOver ) {
+							leftOver--;
+							if ( (flagByte & bmISLAST) && !leftOver ) {
+								TMS = 1; // Exit Shift-DR state on next clock
+							}
+							TDI = tdiByte & 1;
+							tdiByte >>= 1;
+							TCK = 1;
+							TCK = 0;
+							i <<= 1;
+						}
+					} else {
+						// This is not the last chunk
+						bytesRemaining = (bitsRead>>3);
+						while ( bytesRemaining-- ) {
+							shiftOut(*inPtr++);
+						}
+					}
+
 					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
 					numBits -= bitsRead;
 				}
@@ -229,14 +262,51 @@ void main_loop(void) {
 		} else {
 			if ( flagByte & bmNEEDRESPONSE ) {
 				// The host is not giving us data, but is expecting a response (x0r)
-				uint16 i;
+				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+				uint8 tdiByte;
+				if ( (flagByte & bmSENDMASK) == bmSENDZEROS ) {
+					tdiByte = 0x00;
+				} else {
+					tdiByte = 0xFF;
+				}
 				while ( numBits ) {
 					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
 					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
 					bytesRead = bitsToBytes(bitsRead);
 
-					for ( i = 0; i < bytesRead; i++ ) {
-						EP4FIFOBUF[i] = 0xAA;
+					inPtr = EP2FIFOBUF;
+					outPtr = EP4FIFOBUF;
+					if ( bitsRead == numBits ) {
+						// This is the last chunk
+						uint8 tdoByte, leftOver, i;
+						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
+						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
+						bytesRemaining = (bitsRemaining>>3);
+						while ( bytesRemaining-- ) {
+							*outPtr++ = shiftInOut(tdiByte);
+						}
+						tdoByte = 0x00;
+						i = 1;
+						TDI = tdiByte & 1;
+						while ( i && leftOver ) {
+							leftOver--;
+							if ( (flagByte & bmISLAST) && !leftOver ) {
+								TMS = 1; // Exit Shift-DR state on next clock
+							}
+							if ( TDO ) {
+								tdoByte |= i;
+							}
+							TCK = 1;
+							TCK = 0;
+							i <<= 1;
+						}
+						*outPtr++ = tdoByte;
+					} else {
+						// This is not the last chunk
+						bytesRemaining = (bitsRead>>3);
+						while ( bytesRemaining-- ) {
+							*outPtr++ = shiftInOut(tdiByte);
+						}
 					}
 					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the data
 					SYNCDELAY; EP4BCL = LSB(bytesRead);
@@ -244,7 +314,28 @@ void main_loop(void) {
 				}
 			} else {
 				// The host is not giving us data, and does not need a response (x0n)
-				numBits = 0UL;
+				uint32 bitsRemaining, bytesRemaining;
+				uint8 tdiByte, leftOver;
+				if ( (flagByte & bmSENDMASK) == bmSENDZEROS ) {
+					tdiByte = 0x00;
+				} else {
+					tdiByte = 0xFF;
+				}
+				bitsRemaining = (numBits-1) & 0xFFFFFFF8;    // Now an integer number of bytes
+				leftOver = (uint8)(numBits - bitsRemaining); // How many bits in last byte (1-8)
+				bytesRemaining = (bitsRemaining>>3);
+				while ( bytesRemaining-- ) {
+					shiftOut(tdiByte);
+				}
+				TDI = tdiByte & 1;
+				while ( leftOver ) {
+					leftOver--;
+					if ( (flagByte & bmISLAST) && !leftOver ) {
+						TMS = 1; // Exit Shift-DR state on next clock
+					}
+					TCK = 1;
+					TCK = 0;
+				}
 			}
 		}
 	}
@@ -266,23 +357,62 @@ bool handle_vendorcommand(uint8 cmd) {
 				numBits = *((uint32 *)EP0BUF);   // Remember length
 
 				// Go to Test-Logic-Reset
-				IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				//IOD = bmTMS;
+				//IOD = bmTMS|bmTCK; IOD = bmTMS;
+				//IOD = bmTMS|bmTCK; IOD = bmTMS;
+				//IOD = bmTMS|bmTCK; IOD = bmTMS;
+				//IOD = bmTMS|bmTCK; IOD = bmTMS;
+				//IOD = bmTMS|bmTCK; IOD = bmTMS;
 				
-				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Run-Test/Idle
-				IOD = bmTMS; IOD = bmTMS|bmTCK; IOD = bmTMS;     // Now in Select-DR Scan
-				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Capture-DR
-				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Shift-DR
+				//IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Run-Test/Idle
+				//IOD = bmTMS; IOD = bmTMS|bmTCK; IOD = bmTMS;     // Now in Select-DR Scan
+				//IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Capture-DR
+				//IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Shift-DR
 
 				// This operation continues in main_loop()...
 			} else {
 				// Unrecognised operation
 				return false;
 			}
+			break;
+
+		// Clock an (up to) 32-bit pattern LSB-first into TMS to change JTAG TAP states
+		//
+		case CMD_CLOCK_STATE_MACHINE:
+			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+				uint8 transitionCount = SETUPDAT[2];
+				uint32 bitPattern;
+				EP0BCL = 0x00;                     // Allow host transfer in
+				while ( EP0CS & bmEPBUSY );        // Wait for data
+				bitPattern = *((uint32 *)EP0BUF);  // Remember length
+				while ( transitionCount-- ) {
+					TMS = bitPattern & 1;
+					TCK = 1;
+					TCK = 0;
+					bitPattern >>= 1;
+				}
+			} else {
+				// This command does not support OUT operations
+				//
+				return false;
+			}
+			break;
+
+		// Execute a number of JTAG clocks.
+		//
+		case CMD_CLOCK:
+			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+				uint32 numCycles = MAKEDWORD(SETUP_VALUE(), SETUP_INDEX());
+				while ( numCycles-- ) {
+					TCK = 1;
+					TCK = 0;
+				}
+			} else {
+				// This command does not support OUT operations
+				//
+				return false;
+			}
+			break;
 
 		// Simple JTAG scan-chain operation
 		//

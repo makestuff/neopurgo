@@ -1,10 +1,7 @@
 # cd hermes
-# cd firmware
-# make
-# cd ..\host
-# make
-# cd ..
+# cd host && make clean && make && cd ..\firmware && make clean && make && cd ..\xilprg && build.bat && cd ..
 # fx2loader firmware/firmware.hex
+# xilprg\obj\win32\Release\xilprg.exe vhdl\fx2fpga.bit
 # host\Debug\host.exe
 Read 10 bytes from endpoint 8:  A9 A9 A9 A9 A9 A9 A9 A9 A9 A9
 # host\Debug\host.exe -i
@@ -12,8 +9,6 @@ Read 10 bytes from endpoint 8:  A9 A9 A9 A9 A9 A9 A9 A9 A9 A9
 Writing:  01
 > 01
 Writing:  01
-> x
-Read 16 bytes from endpoint 4:  48 45 4C 4C 4F 20 57 4F 52 4C 44 21 21 21 21 00
 > q
 #
 
