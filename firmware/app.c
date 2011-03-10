@@ -134,58 +134,78 @@ void main_init(void) {
 	OED = bmTDI | bmTMS | bmTCK;
 }
 
-uint32 numBytes = 0UL;
+uint32 numBits = 0UL;
 uint8 flagByte = 0x00;
+
+#define ENDPOINT_SIZE 512
 
 // Called repeatedly while the device is idle
 //
 void main_loop(void) {
-	uint16 chunkSize, i;
-	if ( numBytes ) {
+	uint16 i, bitsRead, bitsRemaining, bytesRead;
+	if ( numBits ) {
 		if ( (flagByte & bmSENDMASK) == bmSENDDATA ) {
 			if ( flagByte & bmNEEDRESPONSE ) {
 				// The host is giving us data, and is expecting a response (xdr)
-				while ( numBytes ) {
+				while ( numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-					chunkSize = MAKEWORD(EP2BCH, EP2BCL);
 					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-					for ( i = 0; i < chunkSize; i++ ) {
+					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
+					bytesRead = MAKEWORD(EP2BCH, EP2BCL);
+					if ( bytesRead != bitsToBytes(bitsRead) ) {
+						// Protocol violation - give up
+						numBits = 0UL;
+						break;
+					}
+
+					// ------------------
+					for ( i = 0; i < bytesRead; i++ ) {
 						if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
 							EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
 						} else {
 							EP4FIFOBUF[i] = EP2FIFOBUF[i];
 						}
 					}
-					SYNCDELAY; EP4BCH = MSB(chunkSize);  // Initiate send of the copied data
-					SYNCDELAY; EP4BCL = LSB(chunkSize);
+					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the copied data
+					SYNCDELAY; EP4BCL = LSB(bytesRead);
 					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-					numBytes -= chunkSize;
+					// ------------------
+
+					numBits -= bitsRead;
 				}
 			} else {
 				// The host is giving us data, but does not need a response (xdn)
-				while ( numBytes ) {
+				while ( numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-					chunkSize = MAKEWORD(EP2BCH, EP2BCL);
+					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
+					bytesRead = MAKEWORD(EP2BCH, EP2BCL);
+					if ( bytesRead != bitsToBytes(bitsRead) ) {
+						// Protocol violation - give up
+						numBits = 0UL;
+						break;
+					}
 					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-					numBytes -= chunkSize;
+					numBits -= bitsRead;
 				}
 			}
 		} else {
 			if ( flagByte & bmNEEDRESPONSE ) {
 				// The host is not giving us data, but is expecting a response (x0r)
-				while ( numBytes ) {
+				while ( numBits ) {
 					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-					chunkSize = (numBytes > 512) ? 512 : (uint16)numBytes;
-					for ( i = 0; i < chunkSize; i++ ) {
+					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
+					bytesRead = bitsToBytes(bitsRead);
+
+					for ( i = 0; i < bytesRead; i++ ) {
 						EP4FIFOBUF[i] = 0xAA;
 					}
-					SYNCDELAY; EP4BCH = MSB(chunkSize);  // Initiate send of the copied data
-					SYNCDELAY; EP4BCL = LSB(chunkSize);
-					numBytes -= chunkSize;
+					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the data
+					SYNCDELAY; EP4BCL = LSB(bytesRead);
+					numBits -= bitsRead;
 				}
 			} else {
 				// The host is not giving us data, and does not need a response (x0n)
-				numBytes = 0UL;
+				numBits = 0UL;
 			}
 		}
 	}
@@ -205,7 +225,7 @@ bool handle_vendorcommand(uint8 cmd) {
 				flagByte = SETUPDAT[2];          // Remember flag byte
 				EP0BCL = 0x00;                   // Allow host transfer in
 				while ( EP0CS & bmEPBUSY );      // Wait for data
-				numBytes = *((uint32 *)EP0BUF);  // Remember length
+				numBits = *((uint32 *)EP0BUF);   // Remember length
 				// This operation continues in main_loop()...
 			} else {
 				// Unrecognised operation

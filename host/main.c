@@ -93,6 +93,7 @@ void dumpSimple(const unsigned char *input, unsigned int length) {
 }
 */
 
+#define ENDPOINT_SIZE 512
 
 #define bmNEEDRESPONSE (1<<0)
 #define bmISLAST       (1<<1)
@@ -200,7 +201,7 @@ int main(int argc, char *argv[]) {
 					const char *ptr = text;
 					uint32 numBytes = strlen(text);
 					uint16 chunkSize;
-					*((uint32 *)byteBuf) = numBytes;
+					*((uint32 *)byteBuf) = (numBytes<<3);
 					if ( linePtr[2] == 'r' ) {
 						// Need to send data, and need a response
 						returnCode = usb_control_msg(
@@ -214,7 +215,7 @@ int main(int argc, char *argv[]) {
 						}
 		
 						do {
-							chunkSize = (numBytes>=512) ? 512 : (uint16)numBytes;
+							chunkSize = (numBytes>=ENDPOINT_SIZE) ? ENDPOINT_SIZE : (uint16)numBytes;
 							strncpy(byteBuf, ptr, chunkSize);
 							ptr += chunkSize;
 							numBytes -= chunkSize;
@@ -260,7 +261,7 @@ int main(int argc, char *argv[]) {
 				} else {
 					// -----------------------------------------------------
 					// Not sending
-					*((uint32 *)byteBuf) = 400;
+					*((uint32 *)byteBuf) = (400<<3);
 					if ( linePtr[2] == 'r' ) {
 						// Not sending data, but a response is needed
 						returnCode = usb_control_msg(
