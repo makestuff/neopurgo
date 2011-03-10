@@ -42,6 +42,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <windows.h>
 #include "xilprg.h"
 #include "utils.h"
 #include "cmds.h"
@@ -65,6 +66,31 @@ const char* strREADBACK = "READBACK";
 const char* strCABLE = "CABLE";
 
 int register_xilinx_functions();
+
+int getConfigFullPath(const char *configFileName, char *buffer, unsigned int bufSize) {
+	DWORD returnCode;
+	char *ptr = buffer, *slash = NULL;
+	buffer[bufSize-1] = 0;
+	returnCode = GetModuleFileName(NULL, buffer, bufSize-1);
+	if ( returnCode == bufSize-1 ) {
+		return -1;
+	}
+	while ( *ptr ) {
+		if ( *ptr == '\\' ) {
+			slash = ptr;
+		}
+		ptr++;
+	}
+	if ( !slash ) {
+		return -2;
+	}
+	slash++;
+	if ( (slash-buffer+strlen(configFileName)) >= bufSize ) {
+		return -3;
+	}
+	strcpy(slash, configFileName);
+	return 0;
+}
 
 int initialize()
 {
@@ -258,40 +284,50 @@ cleanup:
 
 int main(int argc, const char *argv[])
 {
-    char line[1024];
-    int rc = -1;
+	char line[1024];
+	char configFileName[MAX_PATH+1];
+	int rc = -1;
 
 	if ( argc != 2 ) {
 		fprintf(stderr, "Synopsis: xilprg <bitFile>\n");
 		exit(1);
 	}
 
-    process_command_line("version");
-    printf("\n");
+	process_command_line("version");
+	printf("\n");
 
-    if (initialize())
-        goto cleanup;
-
-	if (load_config_file("C:/Users/chris/src/apps/hermes/xilprg/xilprg.conf"))
+	if ( initialize() ) {
+		rc = -1;
 		goto cleanup;
+	}
+
+	rc = getConfigFullPath("xilprg.conf", configFileName, sizeof(configFileName));
+	if ( rc ) {
+		rc = -2;
+		goto cleanup;
+	}
+
+	if ( load_config_file(configFileName) ) {
+		rc = -3;
+		goto cleanup;
+	}
 
 	process_command_line("cable nero");
 	strcpy(line, "program 1 ");
 	strcpy(line+10, argv[1]);
 	process_command_line(line);
 	
-	//do
-    //{
-    //   if (prompt_read_line("xilprg> ", line, sizeof(line)) < 0)
+	//do {
+	//	if (prompt_read_line("xilprg> ", line, sizeof(line)) < 0)
 	//		break;
-    //}
-    //while (process_command_line(line) != CMDLINE_EXIT_PROGRAM);
+	//} while (process_command_line(line) != CMDLINE_EXIT_PROGRAM);
 
-    rc = 0;
+	rc = 0;
 
 cleanup:
-
-    uninitialize();
-   
-    return rc;
+	if ( rc ) {
+		fprintf(stderr, "Failed returnCode %d\n", rc);
+	}
+	uninitialize();   
+	return rc;
 }
