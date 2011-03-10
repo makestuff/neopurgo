@@ -204,6 +204,8 @@ int main(int argc, char *argv[]) {
 					*((uint32 *)byteBuf) = (numBytes<<3);
 					if ( linePtr[2] == 'r' ) {
 						// Need to send data, and need a response
+						numBytes = 9;
+						*((uint32 *)byteBuf) = numBytes*8 - 2;
 						returnCode = usb_control_msg(
 							deviceHandle,
 							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
@@ -234,10 +236,10 @@ int main(int argc, char *argv[]) {
 								continue;
 							}
 							byteBuf[chunkSize] = 0x00;
-							printf("Read %d bytes from endpoint 4: \"%s\"\n", returnCode, byteBuf);
-							//printf("Read %d bytes from endpoint 4: ", returnCode);
-							//dumpSimple(byteBuf, returnCode);
-							//printf("\n");
+							//printf("Read %d bytes from endpoint 4: \"%s\"\n", returnCode, byteBuf);
+							printf("Read %d bytes from endpoint 4: ", returnCode);
+							dumpSimple(byteBuf, returnCode);
+							printf("\n");
 						} while ( numBytes );
 					} else {
 						// Need to send data, but no response is needed

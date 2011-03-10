@@ -139,14 +139,98 @@ uint8 flagByte = 0x00;
 
 #define ENDPOINT_SIZE 512
 
+/*
+;; For ShiftInOut, the timing is a little more
+;; critical because we have to read _TDO/shift/set _TDI
+;; when _TCK is low. But 20% duty cycle at 48/4/5 MHz
+;; is just like 50% at 6 Mhz, and that's still acceptable
+*/
+uint8 shiftInOut(uint8 c) {
+	/* Shift out byte C, shift in from TDO:
+	 *
+	 * 8x {
+	 *   Read carry from TDO
+	 *   Output least significant bit on TDI
+	 *   Raise TCK
+	 *   Shift c right, append carry (TDO) at left
+	 *   Lower TCK
+	 * }
+	 * Return c.
+	 */
+	
+	(void)c; /* argument passed in DPL */
+	
+	_asm
+		mov  A, DPL
+
+		;; Bit0
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit1
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit2
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit3
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit4
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit5
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit6
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit7
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		nop
+		clr  _TCK
+		
+		mov  DPL, A
+		ret
+	_endasm;
+
+	/* return value in DPL */
+
+	return c;
+}
+
 // Called repeatedly while the device is idle
 //
 void main_loop(void) {
-	uint16 i, bitsRead, bitsRemaining, bytesRead;
+	uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
 	if ( numBits ) {
 		if ( (flagByte & bmSENDMASK) == bmSENDDATA ) {
 			if ( flagByte & bmNEEDRESPONSE ) {
 				// The host is giving us data, and is expecting a response (xdr)
+				uint8 *inPtr, *outPtr;
 				while ( numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
 					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
@@ -158,23 +242,51 @@ void main_loop(void) {
 						break;
 					}
 
-					// ------------------
-					for ( i = 0; i < bytesRead; i++ ) {
-						if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
-							EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
-						} else {
-							EP4FIFOBUF[i] = EP2FIFOBUF[i];
+					inPtr = EP2FIFOBUF;
+					outPtr = EP4FIFOBUF;
+					if ( bitsRead == numBits ) {
+						// This is the last chunk
+						uint8 tdoByte, tdiByte, leftOver, i;
+						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
+						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
+						bytesRemaining = (bitsRemaining>>3);
+						while ( bytesRemaining-- ) {
+							*outPtr++ = shiftInOut(*inPtr++);
+						}
+						tdiByte = *inPtr++;  // Now do the bits in the final byte
+						tdoByte = 0x00;
+						i = 1;
+						while ( i && leftOver ) {
+							leftOver--;
+							if ( (flagByte & bmISLAST) && !leftOver ) {
+								TMS = 1; // Exit Shift-DR state on next clock
+							}
+							TDI = tdiByte & 1;
+							tdiByte >>= 1;
+							if ( TDO ) {
+								tdoByte |= i;
+							}
+							TCK = 1;
+							TCK = 0;
+							i <<= 1;
+						}
+						*outPtr++ = tdoByte;
+					} else {
+						// This is not the last chunk
+						bytesRemaining = (bitsRead>>3);
+						while ( bytesRemaining-- ) {
+							*outPtr++ = shiftInOut(*inPtr++);
 						}
 					}
 					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the copied data
 					SYNCDELAY; EP4BCL = LSB(bytesRead);
 					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-					// ------------------
 
 					numBits -= bitsRead;
 				}
 			} else {
 				// The host is giving us data, but does not need a response (xdn)
+				uint16 i;
 				while ( numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
 					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
@@ -191,6 +303,7 @@ void main_loop(void) {
 		} else {
 			if ( flagByte & bmNEEDRESPONSE ) {
 				// The host is not giving us data, but is expecting a response (x0r)
+				uint16 i;
 				while ( numBits ) {
 					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
 					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
@@ -226,6 +339,20 @@ bool handle_vendorcommand(uint8 cmd) {
 				EP0BCL = 0x00;                   // Allow host transfer in
 				while ( EP0CS & bmEPBUSY );      // Wait for data
 				numBits = *((uint32 *)EP0BUF);   // Remember length
+
+				// Go to Test-Logic-Reset
+				IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				IOD = bmTMS|bmTCK; IOD = bmTMS;
+				
+				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Run-Test/Idle
+				IOD = bmTMS; IOD = bmTMS|bmTCK; IOD = bmTMS;     // Now in Select-DR Scan
+				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Capture-DR
+				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Shift-DR
+
 				// This operation continues in main_loop()...
 			} else {
 				// Unrecognised operation
