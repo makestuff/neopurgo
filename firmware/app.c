@@ -52,10 +52,9 @@
 // Function declarations
 bool promRead(uint16 addr, uint8 length, uint8 xdata *buf);
 bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf);
+void shiftOut(uint8 c);
+uint8 shiftInOut(uint8 c);
 void fifo_send(void);
-
-// The minimum number of bytes necessary to store this many bits
-#define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
 
 // Addressable bits on Port D for the four JTAG lines (named after the FPGA pins they connect to)
 // TDO is an input, the rest are outputs.
@@ -70,6 +69,8 @@ sbit at 0xB4      TCK; /* Port D.4 */
 #define bmTMS     bmBIT3
 #define bmTCK     bmBIT4
 
+// Macros for NeroJTAG implementation
+#define ENDPOINT_SIZE 512
 #define bmNEEDRESPONSE (1<<0)
 #define bmISLAST       (1<<1)
 #define bmSENDZEROS    (0<<2)
@@ -77,11 +78,24 @@ sbit at 0xB4      TCK; /* Port D.4 */
 #define bmSENDDATA     (2<<2)
 #define bmSENDMASK     (3<<2)
 
+// The minimum number of bytes necessary to store this many bits
+#define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
+
+// The USB vendor commands
 enum {
-	CMD_CLOCK_DATA = 0x80,
+	CMD_CLOCK_DATA = 0x80,        // NeroJTAG commands
 	CMD_CLOCK_STATE_MACHINE,
-	CMD_CLOCK
+	CMD_CLOCK,
+
+	CMD_SCAN_CHAIN_TEST = 0x90,   // Temporary/testing commands
+	CMD_CALCULATOR_TEST,
+
+	CMD_READ_WRITE_EEPROM = 0xA2  // Read/Write the EEPROM
 };
+
+// Globals
+static uint32 numBits = 0UL;
+static uint8 flagByte = 0x00;
 
 // Called once at startup
 //
@@ -132,94 +146,6 @@ void main_init(void) {
 
 	// Three JTAG bits drive pins on the FPGA
 	OED = bmTDI | bmTMS | bmTCK;
-}
-
-uint32 numBits = 0UL;
-uint8 flagByte = 0x00;
-
-#define ENDPOINT_SIZE 512
-
-/*
-;; For ShiftInOut, the timing is a little more
-;; critical because we have to read _TDO/shift/set _TDI
-;; when _TCK is low. But 20% duty cycle at 48/4/5 MHz
-;; is just like 50% at 6 Mhz, and that's still acceptable
-*/
-uint8 shiftInOut(uint8 c) {
-	/* Shift out byte C, shift in from TDO:
-	 *
-	 * 8x {
-	 *   Read carry from TDO
-	 *   Output least significant bit on TDI
-	 *   Raise TCK
-	 *   Shift c right, append carry (TDO) at left
-	 *   Lower TCK
-	 * }
-	 * Return c.
-	 */
-	
-	(void)c; /* argument passed in DPL */
-	
-	_asm
-		mov  A, DPL
-
-		;; Bit0
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit1
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit2
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit3
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit4
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit5
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit6
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit7
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		nop
-		clr  _TCK
-		
-		mov  DPL, A
-		ret
-	_endasm;
-
-	/* return value in DPL */
-
-	return c;
 }
 
 // Called repeatedly while the device is idle
@@ -334,7 +260,6 @@ bool handle_vendorcommand(uint8 cmd) {
 		//
 		case CMD_CLOCK_DATA:
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				uint16 chunkSize;
 				flagByte = SETUPDAT[2];          // Remember flag byte
 				EP0BCL = 0x00;                   // Allow host transfer in
 				while ( EP0CS & bmEPBUSY );      // Wait for data
@@ -361,7 +286,7 @@ bool handle_vendorcommand(uint8 cmd) {
 
 		// Simple JTAG scan-chain operation
 		//
-		case 0x90:
+		case CMD_SCAN_CHAIN_TEST:
 			if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 				const uint16 *inArray = (uint16 *)(SETUPDAT+2);
 				uint32 *outArray = (uint32 *)EP0BUF, *ptr = outArray;
@@ -407,7 +332,7 @@ bool handle_vendorcommand(uint8 cmd) {
 	// Simple example command which does the four arithmetic operations on the data from
 	// the host, and sends the results back to the host
 	//
-	case 0x91:
+	case CMD_CALCULATOR_TEST:
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			uint16 num1 = SETUP_VALUE();
 			uint16 num2 = SETUP_INDEX();
@@ -433,13 +358,14 @@ bool handle_vendorcommand(uint8 cmd) {
 
 	// Command to talk to the EEPROM
 	//
-	case 0xa2:
+	case CMD_READ_WRITE_EEPROM:
 		I2CTL |= bm400KHZ;
 		address = SETUP_VALUE();
 		length = SETUP_LENGTH();
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			// It's an IN operation - read from prom and send to host
 			//
+			uint16 chunkSize;
 			while ( length ) {
 				while ( EP0CS & bmEPBUSY );
 				chunkSize = length < EP0BUF_SIZE ? length : EP0BUF_SIZE;
@@ -456,6 +382,7 @@ bool handle_vendorcommand(uint8 cmd) {
 		} else if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 			// It's an OUT operation - read from host and send to prom
 			//
+			uint16 chunkSize;
 			while ( length ) {
 				EP0BCL = 0x00; // allow pc transfer in
 				while ( EP0CS & bmEPBUSY ); // wait for data
@@ -625,6 +552,153 @@ bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf) {
 	} while ( !(I2CS & bmACK) );
 	
 	return false;
+}
+
+// JTAG-clock the supplied byte into TDI, LSB first.
+//
+// Lifted from:
+//   http://ixo-jtag.svn.sourceforge.net/viewvc/ixo-jtag/usb_jtag/trunk/device/c51/hw_nexys.c
+//
+void shiftOut(uint8 c) {
+	/* Shift out byte c:
+	 *
+	 * 8x {
+	 *   Output least significant bit on TDI
+	 *   Raise TCK
+	 *   Shift c right
+	 *   Lower TCK
+	 * }
+	 */
+	
+	(void)c; /* argument passed in DPL */
+	
+	_asm
+		mov  A,DPL
+		;; Bit0
+		rrc  A
+		mov  _TDI,C
+		setb _TCK
+		;; Bit1
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		;; Bit2
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		;; Bit3
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		;; Bit4
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		;; Bit5
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		;; Bit6
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		;; Bit7
+		rrc  A
+		clr  _TCK
+		mov  _TDI,C
+		setb _TCK
+		nop
+		clr  _TCK
+		ret
+	_endasm;
+}
+
+// JTAG-clock the supplied byte into TDI, MSB first. Return the byte clocked out of TDO.
+//
+// Lifted from:
+//   http://ixo-jtag.svn.sourceforge.net/viewvc/ixo-jtag/usb_jtag/trunk/device/c51/hw_nexys.c
+//
+uint8 shiftInOut(uint8 c) {
+	/* Shift out byte c, shift in from TDO:
+	 *
+	 * 8x {
+	 *   Read carry from TDO
+	 *   Output least significant bit on TDI
+	 *   Raise TCK
+	 *   Shift c right, append carry (TDO) at left
+	 *   Lower TCK
+	 * }
+	 * Return c.
+	 */
+	
+	(void)c; /* argument passed in DPL */
+	
+	_asm
+		mov  A, DPL
+
+		;; Bit0
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit1
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit2
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit3
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit4
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit5
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit6
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		clr  _TCK
+		;; Bit7
+		mov  C, _TDO
+		rrc  A
+		mov  _TDI, C
+		setb _TCK
+		nop
+		clr  _TCK
+		
+		mov  DPL, A
+		ret
+	_endasm;
+
+	/* return value in DPL */
+
+	return c;
 }
 
 // Compose a packet to send on the EP6 FIFO, and commit it.
