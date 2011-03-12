@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2009 Chris McClelland
+ * Copyright (C) 2009-2011 Chris McClelland
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,61 +37,6 @@ void dumpSimple(const unsigned char *input, unsigned int length) {
 		--length;
 	}
 }
-
-/*int main(int argc, char *argv[]) {
-	const char *fileName = "fx2fpga.bit";
-	uint32 fileLen, runLen, maxRunLen = 0;
-	const uint8 *runStart, *runEnd, *bufEnd;
-	uint8 *buffer;
-	FILE *inFile = fopen(fileName, "rb");
-	if ( !inFile ) {
-		fprintf(stderr, "Unable to open file \"%s\"\n", fileName);
-		exit(1);
-	}
-	fseek(inFile, 0, SEEK_END);
-	fileLen = ftell(inFile);
-	fseek(inFile, 0, SEEK_SET);
-	buffer = (uint8 *)malloc(fileLen);
-	if ( !buffer ) {
-		fprintf(stderr, "Unable to allocate memory for file \"%s\"\n", fileName);
-		fclose(inFile);
-		exit(2);
-	}
-	if ( fread(buffer, 1, fileLen, inFile) != fileLen ) {
-		fprintf(stderr, "Unable to read file \"%s\"\n", fileName);
-		fclose(inFile);
-		free(buffer);
-		exit(3);
-	}
-
-	printf("Read %d bytes from %s\n", fileLen, fileName);
-
-	bufEnd = buffer + fileLen;
-	runStart = buffer;
-	while ( runStart < bufEnd ) {
-		while ( runStart < bufEnd && *runStart ) {
-			runStart++;
-		}
-		runEnd = runStart;
-		while ( runEnd < bufEnd && !*runEnd ) {
-			runEnd++;
-		}
-		runLen = runEnd - runStart;
-		if ( runLen > 128 ) {
-			printf("Run length = %d\n", runLen);
-		}
-		if ( runLen > maxRunLen ) {
-			maxRunLen = runLen;
-		}
-		runStart = runEnd;
-	}
-
-	printf("Max run length = %d\n", maxRunLen);
-
-	free(buffer);
-	fclose(inFile);
-}
-*/
 
 #define ENDPOINT_SIZE 512
 

@@ -124,6 +124,7 @@ void nero::shift(int numBits, void *const ptdi, void *const ptdo, int isLast) {
 // Apply the supplied bit pattern to TMS, to move the TAP to a specific state.
 //
 void nero::tms_transition(u32 data, int numBits) {
+	//printf("CMD_CLOCK_STATE_MACHINE(0x%08X, %d)\n", data, numBits);
 	int returnCode = usb_control_msg(
 		m_device,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
@@ -142,6 +143,7 @@ void nero::tms_transition(u32 data, int numBits) {
 // Cycle the TCK line for the given number of times.
 //
 void nero::tck_cycle(int numCycles) {
+	//printf("CMD_CLOCK(%d)\n", numCycles);
 	int returnCode = usb_control_msg(
 		m_device,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
@@ -172,6 +174,8 @@ int nero::get_description(string& desc) {
 //
 void nero::beginShift(u32 numBits, SendType sendType, bool isLast, bool isResponseNeeded) {
 	u16 wValue = 0x0000;
+	//printf("CMD_CLOCK_DATA(%d, %s, %s, %s)\n", numBits, (sendType==SEND_DATA)?"SEND":"NOSEND", isLast?"LAST":"NOTLAST", isResponseNeeded?"RECEIVE":"NORECEIVE");
+
 	if ( isLast ) {
 		wValue |= (1<<IS_LAST);
 	}

@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2009 Chris McClelland
+ * Copyright (C) 2009-2011 Chris McClelland
  *
  * Copyright (C) 2009 Ubixum, Inc.
  *
@@ -22,6 +22,8 @@
 #include <i2c.h>
 #include <setupdat.h>
 #include <types.h>
+#include "prom.h"
+#include "jtag.h"
 
 #define SYNCDELAY SYNCDELAY4;
 #define EP0BUF_SIZE 0x40
@@ -50,36 +52,12 @@
 #define REQTYPE_VENDOR      (2 << 5)
 
 // Function declarations
-bool promRead(uint16 addr, uint8 length, uint8 xdata *buf);
-bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf);
-void shiftOut(uint8 c);
-uint8 shiftInOut(uint8 c);
-void fifo_send(void);
+void fifoSendPromData(uint32 bytesToSend);
 
-// Addressable bits on Port D for the four JTAG lines (named after the FPGA pins they connect to)
-// TDO is an input, the rest are outputs.
-sbit at 0xB0      TDO; /* Port D.0 */
-sbit at 0xB2      TDI; /* Port D.2 */
-sbit at 0xB3      TMS; /* Port D.3 */
-sbit at 0xB4      TCK; /* Port D.4 */
-
-// Equivalent bitmasks for OED and IOD.
-#define bmTDO     bmBIT0
-#define bmTDI     bmBIT2
-#define bmTMS     bmBIT3
-#define bmTCK     bmBIT4
-
-// Macros for NeroJTAG implementation
-#define ENDPOINT_SIZE 512
-#define bmNEEDRESPONSE (1<<0)
-#define bmISLAST       (1<<1)
-#define bmSENDZEROS    (0<<2)
-#define bmSENDONES     (1<<2)
-#define bmSENDDATA     (2<<2)
-#define bmSENDMASK     (3<<2)
-
-// The minimum number of bytes necessary to store this many bits
-#define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
+// Defines to allow use of camelCase.
+#define mainInit(x) main_init(x)
+#define mainLoop(x) main_loop(x)
+#define handleVendorCommand handle_vendorcommand
 
 // The USB vendor commands
 enum {
@@ -99,11 +77,20 @@ static uint8 flagByte = 0x00;
 
 // Called once at startup
 //
-void main_init(void) {
+void mainInit(void) {
+
+	uint8 thisByte = 0xFF;
+	uint16 blockSize;
 
 	// Global settings
 	SYNCDELAY; REVCTL = (bmDYN_OUT | bmENH_PKT);
 	SYNCDELAY; CPUCS = bmCLKSPD1;  // 48MHz
+
+	// Check if the FPGA is running (it drives "10" on fifoAddr)
+	SYNCDELAY; IFCONFIG = 0x00;
+	if ( (IOA & (bmBIT4|bmBIT5)) == (bmBIT4|bmBIT5) ) {
+		thisByte = 0x00;  // The FPGA is not running
+	}
 
 	// Drive IFCLK at 48MHz, enable slave FIFOs
 	SYNCDELAY; IFCONFIG = (bmIFCLKSRC | bm3048MHZ | bmIFCLKOE | bmFIFOS);
@@ -146,11 +133,54 @@ void main_init(void) {
 
 	// Three JTAG bits drive pins on the FPGA
 	OED = bmTDI | bmTMS | bmTCK;
+
+	// If the FPGA is active, find the end of the FX2 code in the EEPROM and then send some of the
+	// following data to the FPGA
+	if ( thisByte ) {
+		promStartRead(0x0000);
+		if ( promPeekByte() == 0xC2 ) {
+			promNextByte();    // VID(L)
+			promNextByte();    // VID(H)
+			promNextByte();    // PID(L)
+			promNextByte();    // PID(H)
+			promNextByte();    // DID(L)
+			promNextByte();    // DID(H)
+			promNextByte();    // Config byte
+	
+			promNextByte();    // Length(H)
+			thisByte = promPeekByte();
+			while ( !(thisByte & 0x80) ) {
+				blockSize = thisByte;
+				blockSize <<= 8;
+
+				promNextByte();  // Length(L)
+				blockSize |= promPeekByte();
+
+				blockSize += 2;  // Space taken by address
+				while ( blockSize-- ) {
+					promNextByte();
+				}
+		
+				promNextByte();  // Length(H)
+				thisByte = promPeekByte();
+			}
+			promNextByte();    // Length(L)
+			promNextByte();    // Address(H)
+			promNextByte();    // Address(L)
+			promNextByte();    // Last byte
+	
+			// Send the next 2071 bytes to the FPGA
+			promNextByte();    // First byte of FIFO data
+			fifoSendPromData(2071);
+		}
+		promStopRead();
+	}
 }
 
 // Called repeatedly while the device is idle
 //
-void main_loop(void) {
+void mainLoop(void) {
+	// Are there any JTAG send/receive operations to execute?
 	if ( numBits ) {
 		if ( (flagByte & bmSENDMASK) == bmSENDDATA ) {
 			if ( flagByte & bmNEEDRESPONSE ) {
@@ -343,7 +373,7 @@ void main_loop(void) {
 
 // Called when a vendor command is received
 //
-bool handle_vendorcommand(uint8 cmd) {
+bool handleVendorCommand(uint8 cmd) {
 	uint16 address, length;
 	uint8 i, j;
 	switch(cmd) {
@@ -355,20 +385,6 @@ bool handle_vendorcommand(uint8 cmd) {
 				EP0BCL = 0x00;                   // Allow host transfer in
 				while ( EP0CS & bmEPBUSY );      // Wait for data
 				numBits = *((uint32 *)EP0BUF);   // Remember length
-
-				// Go to Test-Logic-Reset
-				//IOD = bmTMS;
-				//IOD = bmTMS|bmTCK; IOD = bmTMS;
-				//IOD = bmTMS|bmTCK; IOD = bmTMS;
-				//IOD = bmTMS|bmTCK; IOD = bmTMS;
-				//IOD = bmTMS|bmTCK; IOD = bmTMS;
-				//IOD = bmTMS|bmTCK; IOD = bmTMS;
-				
-				//IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Run-Test/Idle
-				//IOD = bmTMS; IOD = bmTMS|bmTCK; IOD = bmTMS;     // Now in Select-DR Scan
-				//IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Capture-DR
-				//IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Shift-DR
-
 				// This operation continues in main_loop()...
 			} else {
 				// Unrecognised operation
@@ -468,7 +484,7 @@ bool handle_vendorcommand(uint8 cmd) {
 			uint16 num2 = SETUP_INDEX();
 			uint16 *outArray = (uint16 *)EP0BUF;
 
-			fifo_send();
+			//fifoSend(0x01);
 
 			// It's an IN operation - prepare the response and send it
 			while ( EP0CS & bmEPBUSY );
@@ -532,349 +548,33 @@ bool handle_vendorcommand(uint8 cmd) {
 	return true;
 }
 
-// Wait for the I2C interface to complete the current send or receive operation. Return true if
-// there was a bus error, else return false if the operation completed successfully.
-//
-bool promWaitForDone() {
-	uint8 i;
-	while ( !((i = I2CS) & bmDONE) );  // Poll the done bit
-	if ( i & bmBERR ) {
-		return true;
-	} else {
-		return false;
-	}
-}	
-
-// Wait for the I2C interface to complete the current send operation. Return true if there was a
-// bus error or the slave failed to acknowledge receipt of the byte, else return false if the
-// operation completed successfully.
-//
-bool promWaitForAck() {
-	uint8 i;
-	while ( !((i = I2CS) & bmDONE) );  // Poll the done bit
-	if ( i & bmBERR ) {
-		return true;
-	} else if ( !(i & bmACK) ) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-// Read "length" bytes from address "addr" in the attached EEPROM, and write them to RAM at "buf".
-//
-bool promRead(uint16 addr, uint8 length, uint8 xdata *buf) {
-	uint8 i;
-	
-	// Wait for I2C idle
-	//
-	while ( I2CS & bmSTOP );
-
-	// Send the WRITE command
-	//
-	I2CS = bmSTART;
-	I2DAT = 0xA2;  // Write I2C address byte (WRITE)
-	if ( promWaitForAck() ) {
-		return true;
-	}
-	
-	// Send the address, MSB first
-	//
-	I2DAT = MSB(addr);  // Write MSB of address
-	if ( promWaitForAck() ) {
-		return true;
-	}
-	I2DAT = LSB(addr);  // Write LSB of address
-	if ( promWaitForAck() ) {
-		return true;
-	}
-
-	// Send the READ command
-	//
-	I2CS = bmSTART;
-	I2DAT = 0xA3;  // Write I2C address byte (READ)
-	if ( promWaitForDone() ) {
-		return true;
-	}
-
-	// Read dummy byte
-	//
-	i = I2DAT;
-	if ( promWaitForDone() ) {
-		return true;
-	}
-
-	// Now get the actual data
-	//
-	for ( i = 0; i < (length-1); i++ ) {
-		buf[i] = I2DAT;
-		if ( promWaitForDone() ) {
-			return true;
-		}
-	}
-
-	// Terminate the read operation and get last byte
-	//
-	I2CS = bmLASTRD;
-	if ( promWaitForDone() ) {
-		return true;
-	}
-	buf[i] = I2DAT;
-	if ( promWaitForDone() ) {
-		return true;
-	}
-	I2CS = bmSTOP;
-	i = I2DAT;
-
-	return false;
-}
-
-// Read "length" bytes from RAM at "buf", and write them to the attached EEPROM at address "addr".
-//
-bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf) {
-	uint8 i;
-
-	// Wait for I2C idle
-	//
-	while ( I2CS & bmSTOP );
-
-	// Send the WRITE command
-	//
-	I2CS = bmSTART;
-	I2DAT = 0xA2;  // Write I2C address byte (WRITE)
-	if ( promWaitForAck() ) {
-		return true;
-	}
-
-	// Send the address, MSB first
-	//
-	I2DAT = MSB(addr);  // Write MSB of address
-	if ( promWaitForAck() ) {
-		return true;
-	}
-	I2DAT = LSB(addr);  // Write LSB of address
-	if ( promWaitForAck() ) {
-		return true;
-	}
-
-	// Write the data
-	//
-	for ( i = 0; i < length; i++ ) {
-		I2DAT = *buf++;
-		if ( promWaitForDone() ) {
-			return true;
-		}
-	}
-	I2CS |= bmSTOP;
-
-	// Wait for I2C idle
-	//
-	while ( I2CS & bmSTOP );
-
-	do {
-		I2CS = bmSTART;
-		I2DAT = 0xA2;  // Write I2C address byte (WRITE)
-		if ( promWaitForDone() ) {
-			return true;
-		}
-		I2CS |= bmSTOP;
-		while ( I2CS & bmSTOP );
-	} while ( !(I2CS & bmACK) );
-	
-	return false;
-}
-
-// JTAG-clock the supplied byte into TDI, LSB first.
-//
-// Lifted from:
-//   http://ixo-jtag.svn.sourceforge.net/viewvc/ixo-jtag/usb_jtag/trunk/device/c51/hw_nexys.c
-//
-void shiftOut(uint8 c) {
-	/* Shift out byte c:
-	 *
-	 * 8x {
-	 *   Output least significant bit on TDI
-	 *   Raise TCK
-	 *   Shift c right
-	 *   Lower TCK
-	 * }
-	 */
-	
-	(void)c; /* argument passed in DPL */
-	
-	_asm
-		mov  A,DPL
-		;; Bit0
-		rrc  A
-		mov  _TDI,C
-		setb _TCK
-		;; Bit1
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		;; Bit2
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		;; Bit3
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		;; Bit4
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		;; Bit5
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		;; Bit6
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		;; Bit7
-		rrc  A
-		clr  _TCK
-		mov  _TDI,C
-		setb _TCK
-		nop
-		clr  _TCK
-		ret
-	_endasm;
-}
-
-// JTAG-clock the supplied byte into TDI, MSB first. Return the byte clocked out of TDO.
-//
-// Lifted from:
-//   http://ixo-jtag.svn.sourceforge.net/viewvc/ixo-jtag/usb_jtag/trunk/device/c51/hw_nexys.c
-//
-uint8 shiftInOut(uint8 c) {
-	/* Shift out byte c, shift in from TDO:
-	 *
-	 * 8x {
-	 *   Read carry from TDO
-	 *   Output least significant bit on TDI
-	 *   Raise TCK
-	 *   Shift c right, append carry (TDO) at left
-	 *   Lower TCK
-	 * }
-	 * Return c.
-	 */
-	
-	(void)c; /* argument passed in DPL */
-	
-	_asm
-		mov  A, DPL
-
-		;; Bit0
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit1
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit2
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit3
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit4
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit5
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit6
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		clr  _TCK
-		;; Bit7
-		mov  C, _TDO
-		rrc  A
-		mov  _TDI, C
-		setb _TCK
-		nop
-		clr  _TCK
-		
-		mov  DPL, A
-		ret
-	_endasm;
-
-	/* return value in DPL */
-
-	return c;
-}
-
 // Compose a packet to send on the EP6 FIFO, and commit it.
 //
-void fifo_send(void) {
-	SYNCDELAY; EP6FIFOCFG = 0x00;      // Disable AUTOOUT
-	SYNCDELAY; FIFORESET = bmNAKALL;   // NAK all OUT packets from host
-	SYNCDELAY; FIFORESET = 6;          // Advance EP6 buffers to CPU domain
+void fifoSendPromData(uint32 bytesToSend) {
 	
-	EP6FIFOBUF[0] = 0x01;              // Compose packet to send to EP6 FIFO
+	uint16 i, chunkSize;
+	uint8 thisByte;
+
+	while ( bytesToSend ) {
+		chunkSize = (bytesToSend >= 512) ? 512 : (uint16)bytesToSend;
+
+		while ( !(EP2468STAT & bmEP6EMPTY) );  // Wait while FIFO remains "not empty" (i.e while busy)
+
+		SYNCDELAY; EP6FIFOCFG = 0x00;          // Disable AUTOOUT
+		SYNCDELAY; FIFORESET = bmNAKALL;       // NAK all OUT packets from host
+		SYNCDELAY; FIFORESET = 6;              // Advance EP6 buffers to CPU domain	
+
+		for ( i = 0; i < chunkSize; i++ ) {
+			EP6FIFOBUF[i] = promPeekByte();      // Compose packet to send to EP6 FIFO
+			promNextByte();
+		}
+		SYNCDELAY; EP6BCH = MSB(chunkSize);    // Commit newly-sourced packet to FIFO
+		SYNCDELAY; EP6BCL = LSB(chunkSize);
 	
-	SYNCDELAY; EP6BCH = 0;             // Commit newly-sourced packet to FIFO
-	SYNCDELAY; EP6BCL = 1;
-	
-	SYNCDELAY; OUTPKTEND = bmSKIP | 6; // Skip uncommitted second packet
-	
-	SYNCDELAY; FIFORESET = 0;          // Release "NAK all"
-	SYNCDELAY; EP6FIFOCFG = bmAUTOOUT; // Enable AUTOOUT again
-}
+		SYNCDELAY; OUTPKTEND = bmSKIP | 6;     // Skip uncommitted second packet
+		bytesToSend -= chunkSize;
 
-uint8 currentConfiguration;  // Current configuration
-uint8 alternateSetting = 0;  // Alternate settings
-
-// Called when a Set Configuration command is received
-//
-bool handle_set_configuration(uint8 cfg) {
-	currentConfiguration = cfg;
-	return(true);  // Handled by user code
-}
-
-// Called when a Get Configuration command is received
-//
-uint8 handle_get_configuration() {
-	return currentConfiguration;
-}
-
-// Called when a Get Interface command is received
-//
-bool handle_get_interface(uint8 ifc, uint8 *alt) {
-	*alt = alternateSetting;
-	return true;
-}
-
-// Called when a Set Interface command is received
-//
-bool handle_set_interface(uint8 ifc, uint8 alt) {
-	alternateSetting = alt;
-	return true;
+		SYNCDELAY; FIFORESET = 0;              // Release "NAK all"
+		SYNCDELAY; EP6FIFOCFG = bmAUTOOUT;     // Enable AUTOOUT again
+	}
 }
