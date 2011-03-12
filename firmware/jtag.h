@@ -19,6 +19,11 @@
 
 #include <types.h>
 
+// NeroJTAG vendor commands
+#define CMD_NEROJTAG_CLOCK_DATA 0x80
+#define CMD_NEROJTAG_CLOCK_FSM  0x81
+#define CMD_NEROJTAG_CLOCK      0x82
+
 // Addressable bits on Port D for the four JTAG lines (named after the FPGA pins they connect to)
 // TDO is an input, the rest are outputs.
 sbit at 0xB0      TDO; /* Port D.0 */
@@ -41,11 +46,10 @@ sbit at 0xB4      TCK; /* Port D.4 */
 #define bmSENDDATA     (2<<2)
 #define bmSENDMASK     (3<<2)
 
-// The minimum number of bytes necessary to store this many bits
-#define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
-
-// Clocking functions (copied from ixo-jtag)
-void shiftOut(uint8);
-uint8 shiftInOut(uint8);
+// Public functions
+void jtagBeginShift(uint32 nBits, uint8 flags);
+void jtagExecuteShift(void);
+void jtagClockFSM(uint32 bitPattern, uint8 transitionCount);
+void jtagClocks(uint32 numClocks);
 
 #endif

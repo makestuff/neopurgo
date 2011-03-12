@@ -19,61 +19,18 @@
 #include <fx2regs.h>
 #include <fx2macros.h>
 #include <delay.h>
-#include <i2c.h>
 #include <setupdat.h>
 #include <types.h>
 #include "prom.h"
 #include "jtag.h"
-
-#define SYNCDELAY SYNCDELAY4;
-#define EP0BUF_SIZE 0x40
-
-// IFCONFIG bits
-#define bmPORTS 0
-#define bmGPIF  (bmIFCFG1)
-#define bmFIFOS (bmIFCFG1 | bmIFCFG0)
-
-// EPxCFG bits
-#define bmBULK bmBIT5
-#define bmBUF2X bmBIT1
-
-// OUTPKTEND bits
-#define bmSKIP bmBIT7
-
-// REVCTL bits
-#define bmDYN_OUT (1<<1)
-#define bmENH_PKT (1<<0)
-
-// USB command macros, copied from Dean Camera's LUFA package
-#define REQDIR_DEVICETOHOST (1 << 7)
-#define REQDIR_HOSTTODEVICE (0 << 7)
-#define REQTYPE_CLASS       (1 << 5)
-#define REQTYPE_STANDARD    (0 << 5)
-#define REQTYPE_VENDOR      (2 << 5)
+#include "defs.h"
 
 // Function declarations
 void fifoSendPromData(uint32 bytesToSend);
 
-// Defines to allow use of camelCase.
-#define mainInit(x) main_init(x)
-#define mainLoop(x) main_loop(x)
-#define handleVendorCommand handle_vendorcommand
-
 // The USB vendor commands
-enum {
-	CMD_CLOCK_DATA = 0x80,        // NeroJTAG commands
-	CMD_CLOCK_STATE_MACHINE,
-	CMD_CLOCK,
-
-	CMD_SCAN_CHAIN_TEST = 0x90,   // Temporary/testing commands
-	CMD_CALCULATOR_TEST,
-
-	CMD_READ_WRITE_EEPROM = 0xA2  // Read/Write the EEPROM
-};
-
-// Globals
-static uint32 numBits = 0UL;
-static uint8 flagByte = 0x00;
+#define CMD_CALCULATOR_TEST   0x90
+#define CMD_READ_WRITE_EEPROM 0xA2
 
 // Called once at startup
 //
@@ -180,195 +137,8 @@ void mainInit(void) {
 // Called repeatedly while the device is idle
 //
 void mainLoop(void) {
-	// Are there any JTAG send/receive operations to execute?
-	if ( numBits ) {
-		if ( (flagByte & bmSENDMASK) == bmSENDDATA ) {
-			if ( flagByte & bmNEEDRESPONSE ) {
-				// The host is giving us data, and is expecting a response (xdr)
-				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				uint8 *inPtr, *outPtr;
-				while ( numBits ) {
-					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
-					bytesRead = MAKEWORD(EP2BCH, EP2BCL);
-					if ( bytesRead != bitsToBytes(bitsRead) ) {
-						// Protocol violation - give up
-						numBits = 0UL;
-						break;
-					}
-
-					inPtr = EP2FIFOBUF;
-					outPtr = EP4FIFOBUF;
-					if ( bitsRead == numBits ) {
-						// This is the last chunk
-						uint8 tdoByte, tdiByte, leftOver, i;
-						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
-						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
-						bytesRemaining = (bitsRemaining>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(*inPtr++);
-						}
-						tdiByte = *inPtr++;  // Now do the bits in the final byte
-						tdoByte = 0x00;
-						i = 1;
-						while ( i && leftOver ) {
-							leftOver--;
-							if ( (flagByte & bmISLAST) && !leftOver ) {
-								TMS = 1; // Exit Shift-DR state on next clock
-							}
-							TDI = tdiByte & 1;
-							tdiByte >>= 1;
-							if ( TDO ) {
-								tdoByte |= i;
-							}
-							TCK = 1;
-							TCK = 0;
-							i <<= 1;
-						}
-						*outPtr++ = tdoByte;
-					} else {
-						// This is not the last chunk
-						bytesRemaining = (bitsRead>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(*inPtr++);
-						}
-					}
-					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the copied data
-					SYNCDELAY; EP4BCL = LSB(bytesRead);
-					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-
-					numBits -= bitsRead;
-				}
-			} else {
-				// The host is giving us data, but does not need a response (xdn)
-				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				uint16 i;
-				while ( numBits ) {
-					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
-					bytesRead = MAKEWORD(EP2BCH, EP2BCL);
-					if ( bytesRead != bitsToBytes(bitsRead) ) {
-						// Protocol violation - give up
-						numBits = 0UL;
-						break;
-					}
-
-					inPtr = EP2FIFOBUF;
-					if ( bitsRead == numBits ) {
-						// This is the last chunk
-						uint8 tdiByte, leftOver, i;
-						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
-						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
-						bytesRemaining = (bitsRemaining>>3);
-						while ( bytesRemaining-- ) {
-							shiftOut(*inPtr++);
-						}
-						tdiByte = *inPtr++;  // Now do the bits in the final byte
-						i = 1;
-						while ( i && leftOver ) {
-							leftOver--;
-							if ( (flagByte & bmISLAST) && !leftOver ) {
-								TMS = 1; // Exit Shift-DR state on next clock
-							}
-							TDI = tdiByte & 1;
-							tdiByte >>= 1;
-							TCK = 1;
-							TCK = 0;
-							i <<= 1;
-						}
-					} else {
-						// This is not the last chunk
-						bytesRemaining = (bitsRead>>3);
-						while ( bytesRemaining-- ) {
-							shiftOut(*inPtr++);
-						}
-					}
-
-					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-					numBits -= bitsRead;
-				}
-			}
-		} else {
-			if ( flagByte & bmNEEDRESPONSE ) {
-				// The host is not giving us data, but is expecting a response (x0r)
-				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				uint8 tdiByte;
-				if ( (flagByte & bmSENDMASK) == bmSENDZEROS ) {
-					tdiByte = 0x00;
-				} else {
-					tdiByte = 0xFF;
-				}
-				while ( numBits ) {
-					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-					bitsRead = (numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : numBits;
-					bytesRead = bitsToBytes(bitsRead);
-
-					inPtr = EP2FIFOBUF;
-					outPtr = EP4FIFOBUF;
-					if ( bitsRead == numBits ) {
-						// This is the last chunk
-						uint8 tdoByte, leftOver, i;
-						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
-						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
-						bytesRemaining = (bitsRemaining>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(tdiByte);
-						}
-						tdoByte = 0x00;
-						i = 1;
-						TDI = tdiByte & 1;
-						while ( i && leftOver ) {
-							leftOver--;
-							if ( (flagByte & bmISLAST) && !leftOver ) {
-								TMS = 1; // Exit Shift-DR state on next clock
-							}
-							if ( TDO ) {
-								tdoByte |= i;
-							}
-							TCK = 1;
-							TCK = 0;
-							i <<= 1;
-						}
-						*outPtr++ = tdoByte;
-					} else {
-						// This is not the last chunk
-						bytesRemaining = (bitsRead>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(tdiByte);
-						}
-					}
-					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the data
-					SYNCDELAY; EP4BCL = LSB(bytesRead);
-					numBits -= bitsRead;
-				}
-			} else {
-				// The host is not giving us data, and does not need a response (x0n)
-				uint32 bitsRemaining, bytesRemaining;
-				uint8 tdiByte, leftOver;
-				if ( (flagByte & bmSENDMASK) == bmSENDZEROS ) {
-					tdiByte = 0x00;
-				} else {
-					tdiByte = 0xFF;
-				}
-				bitsRemaining = (numBits-1) & 0xFFFFFFF8;    // Now an integer number of bytes
-				leftOver = (uint8)(numBits - bitsRemaining); // How many bits in last byte (1-8)
-				bytesRemaining = (bitsRemaining>>3);
-				while ( bytesRemaining-- ) {
-					shiftOut(tdiByte);
-				}
-				TDI = tdiByte & 1;
-				while ( leftOver ) {
-					leftOver--;
-					if ( (flagByte & bmISLAST) && !leftOver ) {
-						TMS = 1; // Exit Shift-DR state on next clock
-					}
-					TCK = 1;
-					TCK = 0;
-				}
-			}
-		}
-	}
+	// If there is a JTAG shift operation pending, execute it now.
+	jtagExecuteShift();
 }
 
 // Called when a vendor command is received
@@ -379,13 +149,12 @@ bool handleVendorCommand(uint8 cmd) {
 	switch(cmd) {
 		// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
 		//
-		case CMD_CLOCK_DATA:
+		case CMD_NEROJTAG_CLOCK_DATA:
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				flagByte = SETUPDAT[2];          // Remember flag byte
-				EP0BCL = 0x00;                   // Allow host transfer in
-				while ( EP0CS & bmEPBUSY );      // Wait for data
-				numBits = *((uint32 *)EP0BUF);   // Remember length
-				// This operation continues in main_loop()...
+				EP0BCL = 0x00;                                     // Allow host transfer in
+				while ( EP0CS & bmEPBUSY );                        // Wait for data
+				jtagBeginShift(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
+				// Now that numBits & flagByte are set, this operation will continue in mainLoop()...
 			} else {
 				// Unrecognised operation
 				return false;
@@ -394,19 +163,11 @@ bool handleVendorCommand(uint8 cmd) {
 
 		// Clock an (up to) 32-bit pattern LSB-first into TMS to change JTAG TAP states
 		//
-		case CMD_CLOCK_STATE_MACHINE:
+		case CMD_NEROJTAG_CLOCK_FSM:
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				uint8 transitionCount = SETUPDAT[2];
-				uint32 bitPattern;
-				EP0BCL = 0x00;                     // Allow host transfer in
-				while ( EP0CS & bmEPBUSY );        // Wait for data
-				bitPattern = *((uint32 *)EP0BUF);  // Remember length
-				while ( transitionCount-- ) {
-					TMS = bitPattern & 1;
-					TCK = 1;
-					TCK = 0;
-					bitPattern >>= 1;
-				}
+				EP0BCL = 0x00;                                   // Allow host transfer in
+				while ( EP0CS & bmEPBUSY );                      // Wait for data
+				jtagClockFSM(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Bit pattern, transitionCount
 			} else {
 				// This command does not support OUT operations
 				//
@@ -416,58 +177,9 @@ bool handleVendorCommand(uint8 cmd) {
 
 		// Execute a number of JTAG clocks.
 		//
-		case CMD_CLOCK:
+		case CMD_NEROJTAG_CLOCK:
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				uint32 numCycles = MAKEDWORD(SETUP_VALUE(), SETUP_INDEX());
-				while ( numCycles-- ) {
-					TCK = 1;
-					TCK = 0;
-				}
-			} else {
-				// This command does not support OUT operations
-				//
-				return false;
-			}
-			break;
-
-		// Simple JTAG scan-chain operation
-		//
-		case CMD_SCAN_CHAIN_TEST:
-			if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
-				const uint16 *inArray = (uint16 *)(SETUPDAT+2);
-				uint32 *outArray = (uint32 *)EP0BUF, *ptr = outArray;
-				uint32 thisID;
-				
-				// Go to Test-Logic-Reset
-				IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				IOD = bmTMS|bmTCK; IOD = bmTMS;
-				
-				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Run-Test/Idle
-				IOD = bmTMS; IOD = bmTMS|bmTCK; IOD = bmTMS;     // Now in Select-DR Scan
-				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Capture-DR
-				IOD = 0x00;  IOD = bmTCK;       IOD = 0x00;      // Now in Shift-DR
-				
-				for ( j = 0; j < 4; j++ ) {
-					thisID = 0UL;
-					for ( i = 0; i < 31; i++ ) {
-						if ( TDO ) {
-							thisID |= 0x80000000;
-						}
-						TCK = 1; TCK = 0;
-						thisID >>= 1;
-					}
-					if ( TDO ) {
-						thisID |= 0x80000000;
-					}
-					TCK = 1; TCK = 0;
-					*ptr++ = thisID;
-				}
-				SYNCDELAY; EP0BCH = 0;
-				SYNCDELAY; EP0BCL = 16;
+				jtagClocks(MAKEDWORD(SETUP_VALUE(), SETUP_INDEX()));
 			} else {
 				// This command does not support OUT operations
 				//
