@@ -143,7 +143,7 @@ void mainLoop(void) {
 
 // Called when a vendor command is received
 //
-bool handleVendorCommand(uint8 cmd) {
+uint8 handleVendorCommand(uint8 cmd) {
 	uint16 address, length;
 	uint8 i, j;
 	switch(cmd) {

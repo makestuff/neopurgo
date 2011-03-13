@@ -21,9 +21,9 @@ static uint8 alternateSetting = 0;  // Alternate settings
 
 // Called when a Set Configuration command is received
 //
-bool handle_set_configuration(uint8 cfg) {
+uint8 handle_set_configuration(uint8 cfg) {
 	currentConfiguration = cfg;
-	return(true);  // Handled by user code
+	return true;  // Handled by user code
 }
 
 // Called when a Get Configuration command is received
@@ -34,14 +34,14 @@ uint8 handle_get_configuration() {
 
 // Called when a Get Interface command is received
 //
-bool handle_get_interface(uint8 ifc, uint8 *alt) {
+uint8 handle_get_interface(uint8 ifc, uint8 *alt) {
 	*alt = alternateSetting;
 	return true;
 }
 
 // Called when a Set Interface command is received
 //
-bool handle_set_interface(uint8 ifc, uint8 alt) {
+uint8 handle_set_interface(uint8 ifc, uint8 alt) {
 	alternateSetting = alt;
 	return true;
 }
