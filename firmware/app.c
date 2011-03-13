@@ -85,6 +85,9 @@ void mainInit(void) {
 	SYNCDELAY; EP8AUTOINLENH = 0x02;
 	SYNCDELAY; EP8AUTOINLENL = 0x00;
 	
+	// Turbo I2C
+	I2CTL |= bm400KHZ;
+
 	// Port lines zero'd before setting direction
 	IOD = 0x00;
 
@@ -144,8 +147,6 @@ void mainLoop(void) {
 // Called when a vendor command is received
 //
 uint8 handleVendorCommand(uint8 cmd) {
-	uint16 address, length;
-	uint8 i, j;
 	switch(cmd) {
 		// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
 		//
@@ -170,7 +171,6 @@ uint8 handleVendorCommand(uint8 cmd) {
 				jtagClockFSM(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Bit pattern, transitionCount
 			} else {
 				// This command does not support OUT operations
-				//
 				return false;
 			}
 			break;
@@ -179,10 +179,9 @@ uint8 handleVendorCommand(uint8 cmd) {
 		//
 		case CMD_NEROJTAG_CLOCK:
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				jtagClocks(MAKEDWORD(SETUP_VALUE(), SETUP_INDEX()));
+				jtagClocks(*((uint32 *)(SETUPDAT+2)));
 			} else {
 				// This command does not support OUT operations
-				//
 				return false;
 			}
 			break;
@@ -196,8 +195,6 @@ uint8 handleVendorCommand(uint8 cmd) {
 			uint16 num2 = SETUP_INDEX();
 			uint16 *outArray = (uint16 *)EP0BUF;
 
-			//fifoSend(0x01);
-
 			// It's an IN operation - prepare the response and send it
 			while ( EP0CS & bmEPBUSY );
 			outArray[0] = num1 + num2;
@@ -209,7 +206,6 @@ uint8 handleVendorCommand(uint8 cmd) {
 			EP0BCL = 8;
 		} else {
 			// This command does not support OUT operations
-			//
 			return false;
 		}
 		break;
@@ -217,13 +213,12 @@ uint8 handleVendorCommand(uint8 cmd) {
 	// Command to talk to the EEPROM
 	//
 	case CMD_READ_WRITE_EEPROM:
-		I2CTL |= bm400KHZ;
-		address = SETUP_VALUE();
-		length = SETUP_LENGTH();
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			// It's an IN operation - read from prom and send to host
-			//
+			uint16 address = SETUP_VALUE();
+			uint16 length = SETUP_LENGTH();
 			uint16 chunkSize;
+			uint8 i;
 			while ( length ) {
 				while ( EP0CS & bmEPBUSY );
 				chunkSize = length < EP0BUF_SIZE ? length : EP0BUF_SIZE;
@@ -239,7 +234,8 @@ uint8 handleVendorCommand(uint8 cmd) {
 			}
 		} else if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 			// It's an OUT operation - read from host and send to prom
-			//
+			uint16 address = SETUP_VALUE();
+			uint16 length = SETUP_LENGTH();
 			uint16 chunkSize;
 			while ( length ) {
 				EP0BCL = 0x00; // allow pc transfer in

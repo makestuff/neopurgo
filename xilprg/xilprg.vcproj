@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories=".\src,../../../3rd/libusb-win32-device-bin-0.1.12.2/include"
+				AdditionalIncludeDirectories=".\src,../../../3rd/libusb-win32-bin-1.2.2.0/include"
 				PreprocessorDefinitions="NDEBUG;WIN32;_CONSOLE;NATIVE_WIN32"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -70,7 +70,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="../../../3rd/libusb-win32-device-bin-0.1.12.2/lib/msvc/libusb.lib"
+				AdditionalDependencies="../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				OutputFile=".\obj\win32\Release/xilprg.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
@@ -134,7 +134,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\src,../../../3rd/libusb-win32-device-bin-0.1.12.2/include"
+				AdditionalIncludeDirectories=".\src,../../../3rd/libusb-win32-bin-1.2.2.0/include"
 				PreprocessorDefinitions="_DEBUG;WIN32;_CONSOLE;NATIVE_WIN32"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -160,7 +160,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="../../../3rd/libusb-win32-device-bin-0.1.12.2/lib/msvc/libusb.lib"
+				AdditionalDependencies="../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				OutputFile=".\obj\win32\Debug/xilprg.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="true"

@@ -104,11 +104,11 @@ void nero::shift(int numBits, void *const ptdi, void *const ptdo, int isLast) {
 	} else {
 		isResponseNeeded = false;
 	}
-	beginShift(numBits, sendType, isLast, isResponseNeeded);
+	beginShift(numBits, sendType, (isLast==0) ? false : true, isResponseNeeded);
 	//printf("beginShift(0x%08X, %d, %d, %d)\n", numBits, sendType, isLast, isResponseNeeded);
 	numBytes = bitsToBytes(numBits);
 	while ( numBytes ) {
-		chunkSize = (numBytes>=ENDPOINT_SIZE) ? ENDPOINT_SIZE : numBytes;
+		chunkSize = (numBytes>=ENDPOINT_SIZE) ? ENDPOINT_SIZE : (u16)numBytes;
 		if ( sendType == SEND_DATA ) {
 			doSend(inPtr, chunkSize);
 			inPtr += chunkSize;
@@ -148,8 +148,8 @@ void nero::tck_cycle(int numCycles) {
 		m_device,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		CMD_CLOCK,         // bRequest
-		numCycles>>16,     // wValue
-		numCycles&0xFFFF,  // wIndex
+		numCycles&0xFFFF,  // wValue
+		numCycles>>16,     // wIndex
 		NULL,              // send bit count
 		0,                 // wLength
 		5000               // timeout in milliseconds
