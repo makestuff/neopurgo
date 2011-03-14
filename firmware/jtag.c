@@ -170,14 +170,20 @@ static uint8 shiftInOut(uint8 c) {
 	return c;
 }
 
+// Kick off a shift operation. Next time jtagExecuteShift() runs, it will execute the shift.
+//
 void jtagBeginShift(uint32 numBits, uint8 flagByte) {
 	m_numBits = numBits;
 	m_flagByte = flagByte;
 }
 
-// The minimum number of bytes necessary to store this many bits
+// The minimum number of bytes necessary to store x bits
+//
 #define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
 
+// Actually execute the shift operation initiated by jtagBeginShift(). This is done in a
+// separate method because vendor commands cannot read & write to bulk endpoints.
+//
 void jtagExecuteShift(void) {
 	// Are there any JTAG send/receive operations to execute?
 	if ( m_numBits ) {
@@ -370,6 +376,9 @@ void jtagExecuteShift(void) {
 	}
 }
 
+// Transition the JTAG state machine to another state: clock "transitionCount" bits from
+// "bitPattern" into TMS, LSB-first.
+//
 void jtagClockFSM(uint32 bitPattern, uint8 transitionCount) {
 	while ( transitionCount-- ) {
 		TMS = bitPattern & 1;
@@ -379,6 +388,8 @@ void jtagClockFSM(uint32 bitPattern, uint8 transitionCount) {
 	}
 }
 
+// Keep TMS and TDI as they are, and clock the JTAG state machine "numClocks" times.
+//
 void jtagClocks(uint32 numClocks) {
 	while ( numClocks-- ) {
 		TCK = 1;

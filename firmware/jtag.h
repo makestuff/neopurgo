@@ -46,10 +46,18 @@ sbit at 0xB4      TCK; /* Port D.4 */
 #define bmSENDDATA     (2<<2)
 #define bmSENDMASK     (3<<2)
 
-// Public functions
-void jtagBeginShift(uint32 nBits, uint8 flags);
+// Kick off a shift operation. Next time jtagExecuteShift() runs, it will execute the shift.
+void jtagBeginShift(uint32 numBits, uint8 flagByte);
+
+// Actually execute the shift operation initiated by jtagBeginShift(). This is done in a
+// separate method because vendor commands cannot read & write to bulk endpoints.
 void jtagExecuteShift(void);
+
+// Transition the JTAG state machine to another state: clock "transitionCount" bits from
+// "bitPattern" into TMS, LSB-first.
 void jtagClockFSM(uint32 bitPattern, uint8 transitionCount);
+
+// Keep TMS and TDI as they are, and clock the JTAG state machine "numClocks" times.
 void jtagClocks(uint32 numClocks);
 
 #endif

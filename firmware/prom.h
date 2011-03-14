@@ -17,6 +17,8 @@
 #ifndef PROM_H
 #define PROM_H
 
+#include <types.h>
+
 bool promRead(uint16 addr, uint8 length, uint8 xdata *buf);
 bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf);
 
