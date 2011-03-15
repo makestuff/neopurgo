@@ -374,6 +374,25 @@ void jtagExecuteShift(void) {
 			}
 		}
 	}
+
+	if ( !(EP2468STAT & bmEP2EMPTY) ) {
+		// EP2 is not empty (host sent us a packet)
+		if  ( !(EP2468STAT & bmEP4FULL) ) {
+			// EP4 is not full (we can send host a packet)
+			uint16 numBytes = MAKEWORD(EP2BCH, EP2BCL);
+			uint16 i;
+			for ( i = 0; i < numBytes; i++ ) {
+				if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
+					EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
+				} else {
+					EP4FIFOBUF[i] = EP2FIFOBUF[i];
+				}
+			}
+			SYNCDELAY; EP4BCH = MSB(numBytes);  // Initiate send of the copied data
+			SYNCDELAY; EP4BCL = LSB(numBytes);
+			SYNCDELAY; OUTPKTEND = bmSKIP | 2;  // Acknowledge receipt of this packet
+		}
+	}
 }
 
 // Transition the JTAG state machine to another state: clock "transitionCount" bits from

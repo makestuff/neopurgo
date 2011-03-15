@@ -65,11 +65,33 @@ nero::~nero() { }
 // Find the NeroJTAG device, open it.
 //
 int nero::open() {
+	const u32 hackLower = 0x6861636B;
+	const u32 hackUpper = 0x4841434B;
+	union {
+		u32 lword;
+		char byteBuf[16];
+	} u;
+	int returnCode;
+	int count;
 	usb_init();
 	usb_find_busses();
 	usb_find_devices();
 	m_device = usbOpenDevice(0x04B4, 0x8613, 1, 0, 0);
-	reset_tap_state();
+
+	count = 0;
+	do {
+		u.lword = hackLower;
+		usb_bulk_write(m_device, USB_ENDPOINT_OUT | 2, u.byteBuf, 4, 100);
+		returnCode = usb_bulk_read(m_device, USB_ENDPOINT_IN | 4, u.byteBuf, 16, 100);
+		count++;
+	} while ( returnCode < 0 && count < 10 );
+
+	if ( count == 10 || returnCode != 4 || u.lword != hackUpper ) {
+		char errMsg[200];
+		sprintf(errMsg, "Init failed returnCode %d with 0x%08X after %d attempts\n", returnCode, u.lword, count);
+		throw nero_exception(errMsg);
+	}
+
 	return 0;
 }
 

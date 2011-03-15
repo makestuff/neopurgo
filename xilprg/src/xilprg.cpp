@@ -52,6 +52,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "digilent.h"
 #include "chip.h"
 #include "cmdline.h"
+#include "nero.h"
 
 globals g;
 
@@ -325,11 +326,16 @@ int main(int argc, const char *argv[])
 		goto cleanup;
 	}
 
-	process_command_line("cable nero");
-	strcpy(line, "program 1 ");
-	strcpy(line+10, argv[1]);
-	process_command_line(line);
-	
+	try {
+		process_command_line("cable nero");
+		strcpy(line, "program 1 ");
+		strcpy(line+10, argv[1]);
+		process_command_line(line);
+	}
+	catch ( const std::exception &ex ) {
+		fprintf(stderr, "%s\n", ex.what());
+		rc = -4;
+	}
 	//do {
 	//	if (prompt_read_line("xilprg> ", line, sizeof(line)) < 0)
 	//		break;

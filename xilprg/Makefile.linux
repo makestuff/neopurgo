@@ -54,6 +54,7 @@ CONF = $(OBJ_DIR)/$(PROJ).conf
 CC    = g++
 LD    = g++
 
+#CPFLAGS = -g -Wall
 CPFLAGS = -O3 -Wall
 LDFLAGS =
 
