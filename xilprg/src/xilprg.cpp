@@ -42,7 +42,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <windows.h>
+#ifdef WIN32
+	#include <windows.h>
+#endif
 #include "xilprg.h"
 #include "utils.h"
 #include "cmds.h"
@@ -68,15 +70,25 @@ const char* strCABLE = "CABLE";
 int register_xilinx_functions();
 
 int getConfigFullPath(const char *configFileName, char *buffer, unsigned int bufSize) {
-	DWORD returnCode;
 	char *ptr = buffer, *slash = NULL;
+
+	#ifdef WIN32
+		const char slashChar = '\\';
+		DWORD returnCode = GetModuleFileName(NULL, buffer, bufSize-1);
+		if ( returnCode == bufSize-1 ) {
+			return -1;
+		}
+	#else
+		const char slashChar = '/';
+		ssize_t returnCode = readlink("/proc/self/exe", buffer, bufSize-1);
+		if ( returnCode == -1 ) {
+			return -1;
+		}
+	#endif
 	buffer[bufSize-1] = 0;
-	returnCode = GetModuleFileName(NULL, buffer, bufSize-1);
-	if ( returnCode == bufSize-1 ) {
-		return -1;
-	}
+
 	while ( *ptr ) {
-		if ( *ptr == '\\' ) {
+		if ( *ptr == slashChar ) {
 			slash = ptr;
 		}
 		ptr++;
@@ -85,6 +97,7 @@ int getConfigFullPath(const char *configFileName, char *buffer, unsigned int buf
 		return -2;
 	}
 	slash++;
+
 	if ( (slash-buffer+strlen(configFileName)) >= bufSize ) {
 		return -3;
 	}
@@ -285,7 +298,7 @@ cleanup:
 int main(int argc, const char *argv[])
 {
 	char line[1024];
-	char configFileName[MAX_PATH+1];
+	char configFileName[4097];  // TODO: Fix, somehow.
 	int rc = -1;
 
 	if ( argc != 2 ) {

@@ -40,6 +40,7 @@ SRCS = \
 	$(SRC_DIR)/prgfile.cpp \
 	$(SRC_DIR)/chip.cpp \
 	$(SRC_DIR)/parport.cpp \
+	$(SRC_DIR)/nero.cpp \
 	$(SRC_DIR)/cable.cpp \
 	$(SRC_DIR)/digilent.cpp \
 	$(SRC_DIR)/xilinx.cpp
@@ -48,6 +49,7 @@ OBJS = $(addsuffix .o, \
 		$(addprefix $(OBJ_DIR)/, \
 		$(basename $(notdir $(SRCS)))))
 TARG = $(OBJ_DIR)/$(PROJ)$(BIN_EXT)
+CONF = $(OBJ_DIR)/$(PROJ).conf
 
 CC    = g++
 LD    = g++
@@ -64,13 +66,16 @@ endif
 ########################################
 # Rules
 
-all: mkdirs $(TARG)
+all: mkdirs $(TARG) $(CONF)
 
 clean:
 	-rm -rf $(OBJ_DIR)
 
 $(TARG) : $(OBJS)
 	$(LD) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
+
+$(CONF) : $(PROJ).conf
+	cp -f $< $@
 
 mkdirs:
 	-mkdir -p $(OBJ_DIR)

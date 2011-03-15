@@ -66,8 +66,7 @@ int main(int argc, char *argv[]) {
 	UsbDeviceHandle *deviceHandle = NULL;
 	int returnCode;
 	uint16 vid, pid;
-	unsigned short checksum = 0x0000;
-	char nop = 0xFF;
+	uint8 nop = 0xFF;
 	//uint32 i;
 	char lineBuf[1026];
 	char *linePtr;
@@ -75,6 +74,10 @@ int main(int argc, char *argv[]) {
 	uint8 *bytePtr;
 	int byteCount;
 	uint8 highNibble, lowNibble;
+	union {
+		uint32 lword;
+		uint8 bytes[4];
+	} u;
 
 	if ( arg_nullcheck(argTable) != 0 ) {
 		printf("%s: insufficient memory\n", progName);
@@ -114,13 +117,16 @@ int main(int argc, char *argv[]) {
 	if ( intOpt->count ) {
 		usb_clear_halt(deviceHandle, USB_ENDPOINT_OUT | outEndpoint);
 		usb_clear_halt(deviceHandle, USB_ENDPOINT_IN | inEndpoint);
-		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, &nop, 1, 1000);
-		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, &nop, 1, 1000);
+		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (const char *)&nop, 1, 1000);
+		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (const char *)&nop, 1, 1000);
 		//returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 1000);
 		//returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 1000);
 		for (  ; ; ) {
 			printf("> ");
-			fgets(lineBuf, 1026, stdin);
+			if ( !fgets(lineBuf, 1026, stdin) ) {
+				fprintf(stderr, "Error getting line from terminal!\n");
+				break;
+			}
 			linePtr = lineBuf;
 			bytePtr = byteBuf;
 			if ( *linePtr == 'h' ) {
@@ -144,17 +150,17 @@ int main(int argc, char *argv[]) {
 					// Need to send data
 					const char *text = "Nor have we been wanting in attention to our British brethren. We have warned them from time to time of attempts by their legislature to extend an unwarrantable jurisdiction over us. We have reminded them of the circumstances of our emigration and settlement here. We have appealed to their native justice and magnanimity, and we have conjured them by the ties of our common kindred to disavow these usurpations, which, would inevitably interrupt our connections and correspondence. They too have been deaf to the voice of justice and of consanguinity. We must, therefore, acquiesce in the necessity, which denounces our separation, and hold them, as we hold the rest of mankind, enemies in war, in peace friends.";
 					const char *ptr = text;
-					uint32 numBytes = strlen(text);
+					int numBytes = strlen(text);
 					uint16 chunkSize;
-					*((uint32 *)byteBuf) = (numBytes<<3);
+					u.lword = (numBytes<<3);
 					if ( linePtr[2] == 'r' ) {
 						// Need to send data, and need a response
 						numBytes = 9;
-						*((uint32 *)byteBuf) = numBytes*8 - 2;
+						u.lword = numBytes*8 - 2;
 						returnCode = usb_control_msg(
 							deviceHandle,
 							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, (bmSENDDATA | bmNEEDRESPONSE), 0x0000, byteBuf, 4, 5000
+							0x80, (bmSENDDATA | bmNEEDRESPONSE), 0x0000, (char*)u.bytes, 4, 5000
 						);
 						if ( returnCode != 4 ) {
 							printf("Error whilst sending control message: %s\n", usb_strerror());
@@ -163,7 +169,7 @@ int main(int argc, char *argv[]) {
 		
 						do {
 							chunkSize = (numBytes>=ENDPOINT_SIZE) ? ENDPOINT_SIZE : (uint16)numBytes;
-							strncpy(byteBuf, ptr, chunkSize);
+							memcpy(byteBuf, ptr, chunkSize);
 							ptr += chunkSize;
 							numBytes -= chunkSize;
 							returnCode = usb_bulk_write(
@@ -191,7 +197,7 @@ int main(int argc, char *argv[]) {
 						returnCode = usb_control_msg(
 							deviceHandle,
 							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, bmSENDDATA, 0x0000, byteBuf, 4, 5000
+							0x80, bmSENDDATA, 0x0000, (char*)u.bytes, 4, 5000
 						);
 						if ( returnCode != 4 ) {
 							printf("Error whilst sending control message: %s\n", usb_strerror());
@@ -208,13 +214,13 @@ int main(int argc, char *argv[]) {
 				} else {
 					// -----------------------------------------------------
 					// Not sending
-					*((uint32 *)byteBuf) = (400<<3);
+					u.lword = (400<<3);
 					if ( linePtr[2] == 'r' ) {
 						// Not sending data, but a response is needed
 						returnCode = usb_control_msg(
 							deviceHandle,
 							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, (bmSENDZEROS | bmNEEDRESPONSE), 0x0000, byteBuf, 4, 5000
+							0x80, (bmSENDZEROS | bmNEEDRESPONSE), 0x0000, (char*)u.bytes, 4, 5000
 						);
 						if ( returnCode != 4 ) {
 							printf("Error whilst sending control message: %s\n", usb_strerror());
@@ -234,7 +240,7 @@ int main(int argc, char *argv[]) {
 						returnCode = usb_control_msg(
 							deviceHandle,
 							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, bmSENDZEROS, 0x0000, byteBuf, 4, 5000
+							0x80, bmSENDZEROS, 0x0000, (char*)u.bytes, 4, 5000
 						);
 						if ( returnCode != 4 ) {
 							printf("Error whilst sending control message: %s\n", usb_strerror());
@@ -304,7 +310,7 @@ int main(int argc, char *argv[]) {
 				printf("\n");
 				returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)buffer, byteCount, 5000);
 				if ( returnCode != byteCount ) {
-					printf("Expected to write %lu bytes to endpoint %d but actually wrote %d: %s\n", byteCount, outEndpoint, returnCode, usb_strerror());
+					printf("Expected to write %d bytes to endpoint %d but actually wrote %d: %s\n", byteCount, outEndpoint, returnCode, usb_strerror());
 					fclose(inFile);
 					free(buffer);
 					continue;
@@ -344,7 +350,7 @@ int main(int argc, char *argv[]) {
 				printf("\n");
 				returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)byteBuf, byteCount, 5000);
 				if ( returnCode != byteCount ) {
-					printf("Expected to write %lu bytes to endpoint %d but actually wrote %d: %s\n", fileLen, outEndpoint, returnCode, usb_strerror());
+					printf("Expected to write %d bytes to endpoint %d but actually wrote %d: %s\n", byteCount, outEndpoint, returnCode, usb_strerror());
 					continue;
 				}
 				//if ( byteBuf[0] & 0x80 ) {
@@ -374,7 +380,7 @@ int main(int argc, char *argv[]) {
 		} while ( returnCode >= 0 );
 		do {
 			byteBuf[0] = 0xfe;
-			usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, byteBuf, 1, 100);
+			usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)byteBuf, 1, 100);
 			returnCode = usb_bulk_read(
 				deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 100);
 		} while ( returnCode < 0 );

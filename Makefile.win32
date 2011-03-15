@@ -28,8 +28,8 @@ all: \
 	rm -f pax_global_header
 	make -f Makefile.win32 -C ../../libs/argtypes
 	make -f Makefile.win32 -C ../../libs/usbwrap
+	make -f Makefile.win32 -C host
 	make -C ../../3rd/fx2lib
-	make -C host
 	make -C firmware
 
 -include Makefile.common
