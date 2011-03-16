@@ -13,8 +13,11 @@ xsvf: $(TOP_LEVEL).xsvf
 
 report: $(TOP_LEVEL).twr
 
-$(TOP_LEVEL).xsvf: $(TOP_LEVEL).bit
-	impact -batch $(PLATFORM).batch
+# This assumes that the "XILINX" environment variable is set 
+$(TOP_LEVEL).xsvf: $(PLATFORM).batch $(TOP_LEVEL).bit
+	cat $< | sed s#\$${XILINX}#$(subst \,/,$(XILINX))#g > temp.batch
+	impact -batch temp.batch
+	rm -f temp.batch
 
 $(TOP_LEVEL).bit: $(TOP_LEVEL).ut $(TOP_LEVEL).ncd
 	bitgen -intstyle ise -f $+
@@ -39,6 +42,6 @@ $(TOP_LEVEL).prj: $(VHDLS)
 	for i in $(TOP_LEVEL).vhdl $+; do echo "vhdl work \"$$i\""; done > $@
 
 clean: FORCE
-	rm -rf _ngo *.bgn *.drc *.ncd *.ntrc_log *.prj *.twr *.csv *.html fx2fpga_xdb _xmsgs *.bit *.gise *.ngc *.pad *.ptwx *.twx *.ngm *.txt *.xml *.xrpt *.bld *.ise *.ngd *.par *.stx *.map *.twr auto_project_xdb *.cmd_log *.lso *.ngr *.pcf *.syr *.unroutes *.xpi *.mrp xst *.log *.cmd *.xwbt iseconfig xlnx_auto_0_xdb
+	rm -rf *.xsvf _ngo *.bgn *.drc *.ncd *.ntrc_log *.prj *.twr *.csv *.html fx2fpga_xdb _xmsgs *.bit *.gise *.ngc *.pad *.ptwx *.twx *.ngm *.txt *.xml *.xrpt *.bld *.ise *.ngd *.par *.stx *.map *.twr auto_project_xdb *.cmd_log *.lso *.ngr *.pcf *.syr *.unroutes *.xpi *.mrp xst *.log *.cmd *.xwbt iseconfig xlnx_auto_0_xdb
 
 FORCE:
