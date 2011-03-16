@@ -1,12 +1,12 @@
 set -tmpdir "xst/projnav.tmp"
 set -xsthdpdir "xst"
 run
--ifn fx2fpga.prj
+-ifn TopLevel.prj
 -ifmt mixed
--ofn fx2fpga
+-ofn TopLevel
 -ofmt NGC
 -p xc3s200-4-ft256
--top fx2fpga
+-top TopLevel
 -opt_mode Speed
 -opt_level 1
 -iuc NO

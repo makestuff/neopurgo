@@ -19,7 +19,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity FX2FPGA is
+entity TopLevel is
 	port(
 		reset_in     : in std_logic;
 		ifclk_in     : in std_logic;
@@ -51,9 +51,9 @@ entity FX2FPGA is
 		anode_out    : out std_logic_vector(3 downto 0);
 		led_out      : out std_logic_vector(7 downto 0)
 	);
-end FX2FPGA;
+end TopLevel;
 
-architecture Behavioural of FX2FPGA is
+architecture Behavioural of TopLevel is
 	type StateType is (
 		STATE_IDLE,
 		STATE_READ,
