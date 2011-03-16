@@ -14,20 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+PLATFORM = linux
 
 all: \
 		../../libs/argtypes \
 		../../libs/usbwrap \
 		../../3rd/fx2lib
 	rm -f pax_global_header
-	make -f Makefile.linux -C ../../libs/argtypes
-	make -f Makefile.linux -C ../../libs/usbwrap
+	make -f Makefile.$(PLATFORM) -C ../../libs/argtypes
+	make -f Makefile.$(PLATFORM) -C ../../libs/usbwrap
+	make -f Makefile.$(PLATFORM) -C host
+	make -f Makefile.$(PLATFORM) -C xilprg
 	make -C ../../3rd/fx2lib
-	make -C host
 	make -C firmware
+	make -C vhdl
 
 -include Makefile.common
-
-clean: FORCE
-	make -C host clean
-	make -C firmware clean

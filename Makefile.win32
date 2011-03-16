@@ -18,6 +18,7 @@ LIBUSB_VERSION = 1.2.2.0
 LIBUSB_HOME = ../../3rd/libusb-win32-bin-$(LIBUSB_VERSION)
 UNZIP_VERSION = 600
 UNZIP_HOME = ../../3rd/unz$(UNZIP_VERSION)
+PLATFORM = win32
 
 all: \
 		../../libs/argtypes \
@@ -26,11 +27,13 @@ all: \
 		$(UNZIP_HOME) \
 		$(LIBUSB_HOME)
 	rm -f pax_global_header
-	make -f Makefile.win32 -C ../../libs/argtypes
-	make -f Makefile.win32 -C ../../libs/usbwrap
-	make -f Makefile.win32 -C host
+	make -f Makefile.$(PLATFORM) -C ../../libs/argtypes
+	make -f Makefile.$(PLATFORM) -C ../../libs/usbwrap
+	make -f Makefile.$(PLATFORM) -C host
+	make -f Makefile.$(PLATFORM) -C xilprg
 	make -C ../../3rd/fx2lib
 	make -C firmware
+	make -C vhdl
 
 -include Makefile.common
 
@@ -47,7 +50,3 @@ $(LIBUSB_HOME):
 	rm libusb-win32.zip
 	mkdir -p ../../3rd
 	mv libusb-win32-bin-$(LIBUSB_VERSION) ../../3rd/
-
-clean: FORCE
-	make -C host clean
-	make -C firmware clean
