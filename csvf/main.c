@@ -142,9 +142,8 @@ int xsvfSwapBytes(Buffer *outBuf) {
 			break;
 
 		case XREPEAT:
-			// Copy the XREPEAT bytes as-is.
-			status = bufAppendByte(outBuf, XREPEAT); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			status = bufAppendByte(outBuf, getNextByte()); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			// Drop XREPEAT.
+			getNextByte();
 			break;
 			
 		case XRUNTEST:
@@ -227,23 +226,19 @@ int xsvfSwapBytes(Buffer *outBuf) {
 		case XENDIR:
 			// Only the default XENDIR state (TAPSTATE_RUN_TEST_IDLE) is supported. Fail fast if
 			// there's an attempt to switch the XENDIR state to PAUSE_IR.
-			status = bufAppendByte(outBuf, XENDIR); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
 			thisByte = getNextByte();
 			if ( thisByte ) {
 				FAIL(ERROR_UNSUPPORTED_DATA);
 			}
-			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
 			break;
 
 		case XENDDR:
 			// Only the default XENDDR state (TAPSTATE_RUN_TEST_IDLE) is supported. Fail fast if
 			// there's an attempt to switch the XENDDR state to PAUSE_DR.
-			status = bufAppendByte(outBuf, XENDDR); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
 			thisByte = getNextByte();
 			if ( thisByte ) {
 				FAIL(ERROR_UNSUPPORTED_DATA);
 			}
-			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
 			break;
 
 		default:
