@@ -28,6 +28,13 @@
 	mkdir -p ../../libs
 	mv makestuff-usbwrap* ../../libs/usbwrap
 
+../../libs/buffer:
+	wget -O buffer.tgz --no-check-certificate https://github.com/makestuff/buffer/tarball/master
+	tar xvzf buffer.tgz
+	rm buffer.tgz
+	mkdir -p ../../libs
+	mv makestuff-buffer* ../../libs/buffer
+
 ../../3rd/fx2lib:
 	wget -O fx2lib.tgz --no-check-certificate https://github.com/mulicheng/fx2lib/tarball/master
 	tar xvzf fx2lib.tgz

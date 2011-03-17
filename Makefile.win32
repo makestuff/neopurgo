@@ -23,12 +23,14 @@ PLATFORM = win32
 all: \
 		../../libs/argtypes \
 		../../libs/usbwrap \
+		../../libs/buffer \
 		../../3rd/fx2lib \
 		$(UNZIP_HOME) \
 		$(LIBUSB_HOME)
 	rm -f pax_global_header
 	make -f Makefile.$(PLATFORM) -C ../../libs/argtypes
 	make -f Makefile.$(PLATFORM) -C ../../libs/usbwrap
+	make -f Makefile.$(PLATFORM) -C ../../libs/buffer
 	make -f Makefile.$(PLATFORM) -C host
 	make -f Makefile.$(PLATFORM) -C xilprg
 	make -C ../../3rd/fx2lib
