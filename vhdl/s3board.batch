@@ -3,6 +3,4 @@ setCable -port xsvf -file TopLevel.xsvf
 addDevice -p 1 -file TopLevel.bit
 addDevice -p 2 -file ${XILINX}/xcf/data/xcf02s.bsd
 program -p 1
-deleteDevice -position 1
-deleteDevice -position 1
 quit
