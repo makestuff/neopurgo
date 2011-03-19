@@ -94,7 +94,7 @@ void neroClose(void) {
 }
 
 // Shift data into and out of JTAG chain.
-//   In pointer may be ALL_ZEROS (shift in zeros) or ALL_ONES (shift in ones).
+//   In pointer may be ZEROS (shift in zeros) or ONES (shift in ones).
 //   Out pointer may be NULL (not interested in data shifted out of the chain).
 //
 NeroStatus neroShift(uint32 numBits, const uint8 *inData, uint8 *outData, bool isLast) {
@@ -104,9 +104,9 @@ NeroStatus neroShift(uint32 numBits, const uint8 *inData, uint8 *outData, bool i
 	bool isResponseNeeded;
 	NeroStatus status;
 
-	if ( inData == ALL_ZEROS ) {
+	if ( inData == ZEROS ) {
 		sendType = SEND_ZEROS;
-	} else if ( inData == ALL_ONES ) {
+	} else if ( inData == ONES ) {
 		sendType = SEND_ONES;
 	} else {
 		sendType = SEND_DATA;

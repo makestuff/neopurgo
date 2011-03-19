@@ -21,8 +21,8 @@
 
 #define NERO_ERR_MAXLENGTH 512
 #define ENDPOINT_SIZE 512
-#define ALL_ZEROS (const uint8*)NULL
-#define ALL_ONES (const uint8*)-1
+#define ZEROS (const uint8*)NULL
+#define ONES (const uint8*)-1
 
 typedef enum {
 	NERO_SUCCESS,
@@ -66,7 +66,7 @@ void neroClose(void);
 
 // Shift "numBits" bits from "inData" into TDI, at the same time shifting the same number of bits
 // from TDO into "outData". If "isLast" is true, leave Shift-DR state on final bit. If you want
-// inData to be all zeros or all ones, you can use ALL_ZEROS or ALL_ONES respectively. This is more
+// inData to be all zeros or all ones, you can use ZEROS or ONES respectively. This is more
 // efficient than composing an array containing all zeros or all 0xFFs.
 NeroStatus neroShift(uint32 numBits, const uint8 *inData, uint8 *outData, bool isLast);
 
