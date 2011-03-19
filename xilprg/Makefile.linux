@@ -55,13 +55,13 @@ CC    = g++
 LD    = g++
 
 #CPFLAGS = -g -Wall
-CPFLAGS = -O3 -Wall
+CPFLAGS = -O3 -Wall -I../../../include -I../libnero
 LDFLAGS =
 
 ifeq ($(IS_CYGWIN),yes)
 LIBS = -lioperm -lreadline
 else
-LIBS = -lusb -lreadline -lncurses
+LIBS = -lusb -lreadline -lncurses ../libnero/libnero.a ../../../libs/usbwrap/libusbwrap.a
 endif
 
 ########################################

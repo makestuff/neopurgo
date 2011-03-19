@@ -52,7 +52,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "digilent.h"
 #include "chip.h"
 #include "cmdline.h"
-#include "nero.h"
 
 globals g;
 

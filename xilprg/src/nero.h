@@ -48,38 +48,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cable.h"
 #include "usb.h"
 
-#define ENDPOINT_SIZE 512
-
-#define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
-
-enum SendType {
-	SEND_ZEROS,
-	SEND_ONES,
-	SEND_DATA,
-	SEND_MASK
-};
-
-enum {
-	IS_RESPONSE_NEEDED = 0,
-	IS_LAST = 1,
-	SEND_TYPE = 2
-};
-
-enum {
-	CMD_CLOCK_DATA = 0x80,
-	CMD_CLOCK_STATE_MACHINE,
-	CMD_CLOCK
-};
-
 class nero : public cable {
-
-	usb_dev_handle *m_device;
-
-	void beginShift(u32 numBits, SendType sendType, bool isLast, bool isResponseNeeded);
-	void doSend(const u8 *sendPtr, u16 chunkSize);
-	void doReceive(u8 *receivePtr, u16 chunkSize);
-	static usb_dev_handle *usbOpenDevice(u16 vid, u16 pid, int configuration, int interface, int alternateInterface);
-
 public:
 	nero();
 	virtual ~nero();
