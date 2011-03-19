@@ -126,19 +126,41 @@ cleanup:
 
 // Parse the XSVF, reversing the byte-ordering of all the bytestreams.
 //
-int xsvfSwapBytes(Buffer *outBuf) {
+int xsvfSwapBytes(Buffer *outBuf, uint16 *maxBufSize) {
 	int returnCode = 0;
-	uint32 xsdrSize = 0UL;
+	uint16 xsdrSize = 0;
+	uint16 numBytes;
 	BufferStatus status;
 	uint8 thisByte;
-	
+
+	*maxBufSize = 0;
 	thisByte = getNextByte();
 	while ( thisByte != XCOMPLETE ) {
 		switch ( thisByte ) {
 		case XTDOMASK:
 			// Swap the XTDOMASK bytes.
+			numBytes = bitsToBytes(xsdrSize);
+			if ( numBytes > BUF_SIZE ) {
+				FAIL(ERROR_UNSUPPORTED_SIZE);
+			}
+			if ( numBytes > *maxBufSize ) {
+				*maxBufSize = numBytes;
+			}
 			status = bufAppendByte(outBuf, XTDOMASK); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			returnCode = swapBytes(bitsToBytes(xsdrSize), outBuf); CHECK_RETURN();
+			returnCode = swapBytes(numBytes, outBuf); CHECK_RETURN();
+			break;
+
+		case XSDRTDO:
+			// Swap the tdiValue and tdoExpected bytes.
+			numBytes = bitsToBytes(xsdrSize);
+			if ( numBytes > BUF_SIZE ) {
+				FAIL(ERROR_UNSUPPORTED_SIZE);
+			}
+			if ( numBytes > *maxBufSize ) {
+				*maxBufSize = numBytes;
+			}
+			status = bufAppendByte(outBuf, XSDRTDO); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			returnCode = swapBytes(2*numBytes, outBuf); CHECK_RETURN();
 			break;
 
 		case XREPEAT:
@@ -164,34 +186,25 @@ int xsvfSwapBytes(Buffer *outBuf) {
 			break;
 
 		case XSDRSIZE:
-			// Copy the XSDRSIZE longword as-is. Fail if it's greater than the defined maximum
-			// buffer size. XSVF players need two such buffers, one for the XTDOMASK value and
-			// another for XSDRTDO's tdoExpected value.
+			// The XSVF spec has the XSDRSIZE as a uint32. But since the bitstreams in XSVF files
+			// are big-endian, they have to be buffered first, thus requiring RAM. I'm going to
+			// stick my neck out and guess that Xilinx tools will never set XSDRSIZE to anything
+			// bigger than 0xFFFF, so we can trim the uint32 down to uint16, and apply a further
+			// size check in XSDRTDO and XTDOMASK to put a further limit on it.
 			status = bufAppendByte(outBuf, XSDRSIZE); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			thisByte = getNextByte();
-			xsdrSize = thisByte;
-			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			thisByte = getNextByte();
-			xsdrSize <<= 8;
-			xsdrSize |= thisByte;
-			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			thisByte = getNextByte();
-			xsdrSize <<= 8;
-			xsdrSize |= thisByte;
-			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			thisByte = getNextByte();
-			xsdrSize <<= 8;
-			xsdrSize |= thisByte;
-			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			if ( bitsToBytes(xsdrSize) > BUF_SIZE ) {
+			if ( getNextByte() ) {
+				FAIL(ERROR_UNSUPPORTED_SIZE);  // Fail if either MSW bytes are nonzero
+			}
+			if ( getNextByte() ) {
 				FAIL(ERROR_UNSUPPORTED_SIZE);
 			}
-			break;
-
-		case XSDRTDO:
-			// Swap the tdiValue and tdoExpected bytes.
-			status = bufAppendByte(outBuf, XSDRTDO); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
-			returnCode = swapBytes(2*bitsToBytes(xsdrSize), outBuf); CHECK_RETURN();
+			thisByte = getNextByte();  // Get MSB
+			xsdrSize = thisByte;
+			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			thisByte = getNextByte();  // Get LSB
+			xsdrSize <<= 8;
+			xsdrSize |= thisByte;
+			status = bufAppendByte(outBuf, thisByte); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
 			break;
 
 		case XSDRB:
@@ -255,31 +268,109 @@ cleanup:
 	return returnCode;
 }
 
+int compress(const Buffer *inBuf, Buffer *outBuf) {
+	int returnCode = 0;
+	const uint8 *runStart, *runEnd, *bufEnd, *chunkStart, *chunkEnd;
+	uint32 runLen, chunkLen;
+	BufferStatus status;
+	bufEnd = inBuf->data + inBuf->length;
+	runStart = chunkStart = inBuf->data;
+	status = bufAppendByte(outBuf, 0x00); CHECK_BUF_STATUS(ERROR_BUF_APPEND); // Hdr byte: defaults
+	while ( runStart < bufEnd ) {
+		// Find next zero
+		while ( runStart < bufEnd && *runStart ) {
+			runStart++;
+		}
+		
+		// Remember the position of the zero
+		runEnd = runStart;
+
+		// Find the end of this run of zeros
+		while ( runEnd < bufEnd && !*runEnd ) {
+			runEnd++;
+		}
+		
+		// Get the length of this run
+		runLen = runEnd - runStart;
+		
+		// If this run is more than four zeros, break the chunk
+		if ( runLen > 8 || runEnd == bufEnd ) {
+			chunkEnd = runStart;
+			chunkLen = chunkEnd - chunkStart;
+
+			// There is now a chunk starting at chunkStart and ending at chunkEnd (length chunkLen),
+			// Followed by a run of zeros starting at runStart and ending at runEnd (length runLen).
+			//printf("Chunk: %d bytes followed by %d zeros\n", chunkLen, runLen);
+			if ( chunkLen < 256 ) {
+				// Short chunk: uint8
+				status = bufAppendByte(outBuf, (uint8)chunkLen); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			} else {
+				// Long chunk: uint16 (big-endian)
+				status = bufAppendByte(outBuf, 0x00); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+				status = bufAppendByte(outBuf, (uint8)((chunkLen>>8)&0x000000FF));
+				CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+				status = bufAppendByte(outBuf, (uint8)(chunkLen&0x000000FF));
+				CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			}
+			while ( chunkStart < chunkEnd ) {
+				status = bufAppendByte(outBuf, *chunkStart++); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			}
+			if ( runLen < 256 ) {
+				// Short run: uint8
+				status = bufAppendByte(outBuf, (uint8)runLen); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			} else {
+				// Long run: uint16 (big-endian)
+				status = bufAppendByte(outBuf, 0x00); CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+				status = bufAppendByte(outBuf, (uint8)((runLen>>8)&0x000000FF));
+				CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+				status = bufAppendByte(outBuf, (uint8)(runLen&0x000000FF));
+				CHECK_BUF_STATUS(ERROR_BUF_APPEND);
+			}
+
+			chunkStart = runEnd;
+		}
+		
+		// Start the next round from the end of this run
+		runStart = runEnd;
+	}
+
+cleanup:
+	return returnCode;
+}
+
 // Read an XSVF file, convert it to a CSVF file and write it out.
 //
 int main(int argc, const char *argv[]) {
 	int returnCode = 0;
-	Buffer csvfBuf;
+	Buffer swapBuf, csvfBuf;
 	BufferStatus status;
+	uint16 maxBufSize;
 	status = bufInitialise(&m_xsvfBuf, 0x20000, 0); CHECK_BUF_STATUS(ERROR_BUF_INIT);
+	status = bufInitialise(&swapBuf, 0x20000, 0); CHECK_BUF_STATUS(ERROR_BUF_INIT);
 	status = bufInitialise(&csvfBuf, 0x20000, 0); CHECK_BUF_STATUS(ERROR_BUF_INIT);
 
 	if ( argc != 3 ) {
-		fprintf(stderr, "Synopsis: %s <xsvfFile> <csvfFile>\n", argv[0]);
+		fprintf(stderr, "Synopsis: %s <xsvfSource> <csvfDestination>\n", argv[0]);
 		FAIL(ERROR_CMDLINE);
 	}
 
 	status = bufAppendFromBinaryFile(&m_xsvfBuf, argv[1]);
 	CHECK_BUF_STATUS(ERROR_BUF_LOAD);
 
-	returnCode = xsvfSwapBytes(&csvfBuf);
+	returnCode = xsvfSwapBytes(&swapBuf, &maxBufSize);
 	CHECK_RETURN();
 
+	printf("#define CSVF_BUFFER_SIZE %d\n", maxBufSize);
+
+	returnCode = compress(&swapBuf, &csvfBuf);
+
 	status = bufWriteBinaryFile(&csvfBuf, argv[2], 0UL, csvfBuf.length);
+	//status = bufWriteBinaryFile(&swapBuf, argv[2], 0UL, swapBuf.length);
 	CHECK_BUF_STATUS(ERROR_BUF_SAVE);
 
 cleanup:
 	bufDestroy(&csvfBuf);
+	bufDestroy(&swapBuf);
 	bufDestroy(&m_xsvfBuf);
 
 	if ( returnCode ) {
