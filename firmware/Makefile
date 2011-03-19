@@ -32,7 +32,7 @@ CC = sdcc
 AS = asx8051
 CCFLAGS = -mmcs51 --code-size 0x3c00 --xram-size 0x0200 --xram-loc 0x3c00 -Wl"-b DSCR_AREA=0x3e00" -Wl"-b INT2JT=0x3f00"
 
-all: $(TARGET).hex
+all: $(TARGET).iic
 
 $(TARGET).hex: $(CC_OBJS) $(AS_OBJS) $(TARGET).rel
 	$(CC) $(CCFLAGS) -o $@ $(CC_OBJS) $(AS_OBJS) $(LIBS)

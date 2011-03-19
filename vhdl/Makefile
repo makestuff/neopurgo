@@ -15,8 +15,8 @@ csvf: $(TOP_LEVEL).csvf
 
 report: $(TOP_LEVEL).twr
 
-$(TOP_LEVEL).csvf: $(TOP_LEVEL).xsvf ../csvf/main
-	../csvf/main $< $@
+$(TOP_LEVEL).csvf: $(TOP_LEVEL).xsvf ../xsvf2csvf/xsvf2csvf
+	../xsvf2csvf/xsvf2csvf $< $@
 
 # This assumes that the "XILINX" environment variable is set 
 $(TOP_LEVEL).xsvf: $(PLATFORM).batch $(TOP_LEVEL).bit

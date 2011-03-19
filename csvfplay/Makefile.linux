@@ -14,17 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-TARGET = main
+TARGET = csvfplay
 LIBS = \
-	../../../libs/buffer/libbuffer.a
+	../libnero/libnero.a \
+	../../../libs/usbwrap/libusbwrap.a \
+	-lusb
 
 INCLUDES = \
 	-I../../../include \
-	-I../../../libs/buffer
+	-I../../../libs/usbwrap \
+	-I../libnero
 
 CC_SRCS = $(shell ls *.c)
 CC_OBJS = $(CC_SRCS:%.c=$(OBJDIR)/%.o)
 CC = gcc
+#CFLAGS = -g -Wall -Wextra -Wstrict-prototypes -Wundef -std=c99 -pedantic-errors $(INCLUDES)
 CFLAGS = -O3 -Wall -Wextra -Wstrict-prototypes -Wundef -std=c99 -pedantic-errors $(INCLUDES)
 LDFLAGS = -Wl,--relax -Wl,--gc-sections
 OBJDIR = .build
@@ -43,4 +47,5 @@ clean: FORCE
 	rm -rf $(OBJDIR) $(TARGET) $(DEPDIR) Debug Release *.ncb *.suo *.sln *.user
 
 -include $(shell mkdir -p $(OBJDIR) $(DEPDIR) 2>/dev/null) $(wildcard $(DEPDIR)/*)
+
 FORCE:
