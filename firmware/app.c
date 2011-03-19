@@ -26,7 +26,7 @@
 #include "defs.h"
 
 // Function declarations
-void fifoSendPromData(xdata uint32 bytesToSend);
+void fifoSendPromData(uint32 bytesToSend);
 
 // The USB vendor commands
 #define CMD_CALCULATOR_TEST   0x90
@@ -150,7 +150,7 @@ void mainLoop(void) {
 
 // Called when a vendor command is received
 //
-uint8 handleVendorCommand(xdata uint8 cmd) {
+uint8 handleVendorCommand(uint8 cmd) {
 	switch(cmd) {
 		// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
 		//
@@ -197,7 +197,7 @@ uint8 handleVendorCommand(xdata uint8 cmd) {
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			xdata uint16 num1 = SETUP_VALUE();
 			xdata uint16 num2 = SETUP_INDEX();
-			xdata uint16 *outArray = (xdata uint16 *)EP0BUF;
+			uint16 *xdata outArray = (uint16 *)EP0BUF;
 
 			// It's an IN operation - prepare the response and send it
 			while ( EP0CS & bmEPBUSY );
@@ -218,7 +218,7 @@ uint8 handleVendorCommand(xdata uint8 cmd) {
 	//
 	case CMD_GET_DIAG_CODE:
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
-			xdata uint16 *outArray = (xdata uint16 *)EP0BUF;
+			uint16 *xdata outArray = (uint16 *)EP0BUF;
 
 			// It's an IN operation - prepare the response and send it
 			while ( EP0CS & bmEPBUSY );
@@ -280,7 +280,7 @@ uint8 handleVendorCommand(xdata uint8 cmd) {
 
 // Compose a packet to send on the EP6 FIFO, and commit it.
 //
-void fifoSendPromData(xdata uint32 bytesToSend) {
+void fifoSendPromData(uint32 bytesToSend) {
 	
 	xdata uint16 i, chunkSize;
 	xdata uint8 thisByte;

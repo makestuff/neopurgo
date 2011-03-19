@@ -71,7 +71,7 @@ bool promNextByte(void) {
 
 // Start a read operation at the specified address. The first byte is read so it can be peeked.
 //
-bool promStartRead(xdata uint16 addr) {
+bool promStartRead(uint16 addr) {
 	xdata uint8 i;
 
 	// Wait for I2C idle
@@ -136,7 +136,7 @@ bool promStopRead(void) {
 
 // Read "length" bytes from address "addr" in the attached EEPROM, and write them to RAM at "buf".
 //
-bool promRead(xdata uint16 addr, xdata uint8 length, xdata uint8 *buf) {
+bool promRead(uint16 addr, uint8 length, xdata uint8 *buf) {
 	xdata uint8 i;
 	
 	// Wait for I2C idle
@@ -204,7 +204,7 @@ bool promRead(xdata uint16 addr, xdata uint8 length, xdata uint8 *buf) {
 
 // Read "length" bytes from RAM at "buf", and write them to the attached EEPROM at address "addr".
 //
-bool promWrite(xdata uint16 addr, xdata uint8 length, const xdata uint8 *buf) {
+bool promWrite(uint16 addr, uint8 length, const xdata uint8 *buf) {
 	xdata uint8 i;
 
 	// Wait for I2C idle

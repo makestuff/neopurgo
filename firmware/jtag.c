@@ -177,7 +177,7 @@ static uint8 shiftInOut(uint8 c) {
 
 // Kick off a shift operation. Next time jtagExecuteShift() runs, it will execute the shift.
 //
-void jtagShiftBegin(xdata uint32 numBits, xdata uint8 flagByte) {
+void jtagShiftBegin(uint32 numBits, uint8 flagByte) {
 	m_numBits = numBits;
 	m_flagByte = flagByte;
 }
@@ -403,7 +403,7 @@ void jtagShiftExecute(void) {
 // Transition the JTAG state machine to another state: clock "transitionCount" bits from
 // "bitPattern" into TMS, LSB-first.
 //
-void jtagClockFSM(xdata uint32 bitPattern, xdata uint8 transitionCount) {
+void jtagClockFSM(uint32 bitPattern, uint8 transitionCount) {
 	while ( transitionCount-- ) {
 		TMS = bitPattern & 1;
 		TCK = 1;
@@ -414,7 +414,7 @@ void jtagClockFSM(xdata uint32 bitPattern, xdata uint8 transitionCount) {
 
 // Keep TMS and TDI as they are, and clock the JTAG state machine "numClocks" times.
 //
-void jtagClocks(xdata uint32 numClocks) {
+void jtagClocks(uint32 numClocks) {
 	while ( numClocks-- ) {
 		TCK = 1;
 		TCK = 0;
@@ -547,7 +547,7 @@ static uint16 getWord(void) {
 
 // Shift out "numBits" bits from the CSVF stream. If "isLast", exit Shift-DR on the final bit.
 //
-static void shiftOutCsvf(xdata uint16 numBits, bool isLast) {
+static void shiftOutCsvf(uint16 numBits, bool isLast) {
 	xdata uint16 bitsRemaining = (numBits-1) & 0xFFF8;        // Now an integer number of bytes
 	xdata uint8 leftOver = (uint8)(numBits - bitsRemaining);  // How many bits in last byte (1-8)
 	xdata uint16 bytesRemaining = (bitsRemaining>>3);
