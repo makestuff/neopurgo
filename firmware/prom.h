@@ -19,10 +19,10 @@
 
 #include <types.h>
 
-bool promRead(uint16 addr, uint8 length, uint8 xdata *buf);
-bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf);
+bool promRead(xdata uint16 addr, xdata uint8 length, xdata uint8 *buf);
+bool promWrite(xdata uint16 addr, xdata uint8 length, const xdata uint8 *buf);
 
-bool promStartRead(uint16 address);
+bool promStartRead(xdata uint16 address);
 bool promNextByte(void);
 uint8 promPeekByte(void);
 bool promStopRead(void);

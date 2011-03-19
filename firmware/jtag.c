@@ -18,10 +18,15 @@
 #include <fx2macros.h>
 #include <delay.h>
 #include "jtag.h"
+#include "prom.h"
 #include "defs.h"
 
-static uint32 m_numBits = 0UL;
-static uint8 m_flagByte = 0x00;
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// NeroJTAG Stuff
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static xdata uint32 m_numBits = 0UL;
+static xdata uint8 m_flagByte = 0x00;
 
 // JTAG-clock the supplied byte into TDI, LSB first.
 //
@@ -172,7 +177,7 @@ static uint8 shiftInOut(uint8 c) {
 
 // Kick off a shift operation. Next time jtagExecuteShift() runs, it will execute the shift.
 //
-void jtagBeginShift(uint32 numBits, uint8 flagByte) {
+void jtagShiftBegin(xdata uint32 numBits, xdata uint8 flagByte) {
 	m_numBits = numBits;
 	m_flagByte = flagByte;
 }
@@ -184,14 +189,14 @@ void jtagBeginShift(uint32 numBits, uint8 flagByte) {
 // Actually execute the shift operation initiated by jtagBeginShift(). This is done in a
 // separate method because vendor commands cannot read & write to bulk endpoints.
 //
-void jtagExecuteShift(void) {
+void jtagShiftExecute(void) {
 	// Are there any JTAG send/receive operations to execute?
 	if ( m_numBits ) {
 		if ( (m_flagByte & bmSENDMASK) == bmSENDDATA ) {
 			if ( m_flagByte & bmNEEDRESPONSE ) {
 				// The host is giving us data, and is expecting a response (xdr)
-				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				uint8 *inPtr, *outPtr;
+				xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+				xdata uint8 *inPtr, *outPtr;
 				while ( m_numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
 					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
@@ -207,7 +212,7 @@ void jtagExecuteShift(void) {
 					outPtr = EP4FIFOBUF;
 					if ( bitsRead == m_numBits ) {
 						// This is the last chunk
-						uint8 tdoByte, tdiByte, leftOver, i;
+						xdata uint8 tdoByte, tdiByte, leftOver, i;
 						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
 						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
 						bytesRemaining = (bitsRemaining>>3);
@@ -247,8 +252,8 @@ void jtagExecuteShift(void) {
 				}
 			} else {
 				// The host is giving us data, but does not need a response (xdn)
-				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				uint16 i;
+				xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+				xdata uint16 i;
 				while ( m_numBits ) {
 					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
 					bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
@@ -262,7 +267,7 @@ void jtagExecuteShift(void) {
 					inPtr = EP2FIFOBUF;
 					if ( bitsRead == m_numBits ) {
 						// This is the last chunk
-						uint8 tdiByte, leftOver, i;
+						xdata uint8 tdiByte, leftOver, i;
 						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
 						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
 						bytesRemaining = (bitsRemaining>>3);
@@ -297,8 +302,8 @@ void jtagExecuteShift(void) {
 		} else {
 			if ( m_flagByte & bmNEEDRESPONSE ) {
 				// The host is not giving us data, but is expecting a response (x0r)
-				uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				uint8 tdiByte;
+				xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+				xdata uint8 tdiByte;
 				if ( (m_flagByte & bmSENDMASK) == bmSENDZEROS ) {
 					tdiByte = 0x00;
 				} else {
@@ -313,7 +318,7 @@ void jtagExecuteShift(void) {
 					outPtr = EP4FIFOBUF;
 					if ( bitsRead == m_numBits ) {
 						// This is the last chunk
-						uint8 tdoByte, leftOver, i;
+						xdata uint8 tdoByte, leftOver, i;
 						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
 						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
 						bytesRemaining = (bitsRemaining>>3);
@@ -349,8 +354,8 @@ void jtagExecuteShift(void) {
 				}
 			} else {
 				// The host is not giving us data, and does not need a response (x0n)
-				uint32 bitsRemaining, bytesRemaining;
-				uint8 tdiByte, leftOver;
+				xdata uint32 bitsRemaining, bytesRemaining;
+				xdata uint8 tdiByte, leftOver;
 				if ( (m_flagByte & bmSENDMASK) == bmSENDZEROS ) {
 					tdiByte = 0x00;
 				} else {
@@ -379,8 +384,8 @@ void jtagExecuteShift(void) {
 		// EP2 is not empty (host sent us a packet)
 		if  ( !(EP2468STAT & bmEP4FULL) ) {
 			// EP4 is not full (we can send host a packet)
-			uint16 numBytes = MAKEWORD(EP2BCH, EP2BCL);
-			uint16 i;
+			xdata uint16 numBytes = MAKEWORD(EP2BCH, EP2BCL);
+			xdata uint16 i;
 			for ( i = 0; i < numBytes; i++ ) {
 				if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
 					EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
@@ -398,7 +403,7 @@ void jtagExecuteShift(void) {
 // Transition the JTAG state machine to another state: clock "transitionCount" bits from
 // "bitPattern" into TMS, LSB-first.
 //
-void jtagClockFSM(uint32 bitPattern, uint8 transitionCount) {
+void jtagClockFSM(xdata uint32 bitPattern, xdata uint8 transitionCount) {
 	while ( transitionCount-- ) {
 		TMS = bitPattern & 1;
 		TCK = 1;
@@ -409,9 +414,289 @@ void jtagClockFSM(uint32 bitPattern, uint8 transitionCount) {
 
 // Keep TMS and TDI as they are, and clock the JTAG state machine "numClocks" times.
 //
-void jtagClocks(uint32 numClocks) {
+void jtagClocks(xdata uint32 numClocks) {
 	while ( numClocks-- ) {
 		TCK = 1;
 		TCK = 0;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSVF Player Stuff
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// XSVF commands (from xapp503 appendix B)
+typedef enum {
+	XCOMPLETE    = 0x00,
+	XTDOMASK     = 0x01,
+	XSIR         = 0x02,
+	XSDR         = 0x03,
+	XRUNTEST     = 0x04,
+	XREPEAT      = 0x07,
+	XSDRSIZE     = 0x08,
+	XSDRTDO      = 0x09,
+	XSETSDRMASKS = 0x0A,
+	XSDRINC      = 0x0B,
+	XSDRB        = 0x0C,
+	XSDRC        = 0x0D,
+	XSDRE        = 0x0E,
+	XSDRTDOB     = 0x0F,
+	XSDRTDOC     = 0x10,
+	XSDRTDOE     = 0x11,
+	XSTATE       = 0x12,
+	XENDIR       = 0x13,
+	XENDDR       = 0x14,
+	XSIR2        = 0x15,
+	XCOMMENT     = 0x16,
+	XWAIT        = 0x17,
+} Command;
+
+// TAP states (from xapp503 appendix B)
+typedef enum {
+	TAPSTATE_TEST_LOGIC_RESET = 0x00,
+	TAPSTATE_RUN_TEST_IDLE    = 0x01,
+	TAPSTATE_SELECT_DR        = 0x02,
+	TAPSTATE_CAPTURE_DR       = 0x03,
+	TAPSTATE_SHIFT_DR         = 0x04,
+	TAPSTATE_EXIT1_DR         = 0x05,
+	TAPSTATE_PAUSE_DR         = 0x06,
+	TAPSTATE_EXIT2_DR         = 0x07,
+	TAPSTATE_UPDATE_DR        = 0x08,
+	TAPSTATE_SELECT_IR        = 0x09,
+	TAPSTATE_CAPTURE_IR       = 0x0A,
+	TAPSTATE_SHIFT_IR         = 0x0B,
+	TAPSTATE_EXIT1_IR         = 0x0C,
+	TAPSTATE_PAUSE_IR         = 0x0D,
+	TAPSTATE_EXIT2_IR         = 0x0E,
+	TAPSTATE_UPDATE_IR        = 0x0F
+} TAPState;
+
+// "Member" variables to store the state of the compression algorithm.
+static bool m_isReadingChunk;
+static xdata uint16 m_count;
+
+// Read the length (of the chunk or the zero run). A short block (<256 bytes) length is encoded in a
+// single byte. If that single byte is zero, we know it's a long block (256-65535 bytes), so read in
+// the next two bytes as a big-endian uint16.
+//
+static uint16 readLength(void) {
+	xdata uint16 len = promPeekByte();
+	promNextByte();
+	if ( !len ) {
+		len = promPeekByte();
+		promNextByte();
+		len <<= 8;
+		len |= promPeekByte();
+		promNextByte();
+	}
+	return len;
+}
+
+// Get the next byte from the uncompressed stream. Uses m_count & m_isReadingChunk to keep state.
+//
+static uint8 getNextByte(void) {
+	if ( m_isReadingChunk ) {
+		// We're in the middle of reading a chunk.
+		if ( m_count ) {
+			// There are still some bytes to copy verbatim into the uncompressed stream.
+			xdata uint8 thisByte;
+			m_count--;
+			thisByte = promPeekByte();
+			promNextByte();
+			return thisByte;
+		} else {
+			// We're at the end of this chunk; there will now be some zeros to insert into the
+			// uncompressed stream.
+			m_count = readLength();
+			m_isReadingChunk = false;
+			return getNextByte();
+		}
+	} else {
+		// We're in the middle of a run of zeros.
+		if ( m_count ) {
+			// There are still some zero bytes to write to the uncompressed stream.
+			m_count--;
+			return 0x00;
+		} else {
+			// We're at the end of this run of zeros; there will now be a chunk of data to be copied
+			// verbatim over to the uncompressed stream.
+			m_count = readLength();
+			m_isReadingChunk = true;
+			return getNextByte();
+		}
+	}
+}
+
+// Initialise the CSVF reader
+//
+void jtagCsvfInit(void) {
+	promNextByte();  // Skip header byte
+	m_count = readLength();
+	m_isReadingChunk = true;
+}
+
+// Get big-endian uint16 from the stream
+//
+static uint16 getWord(void) {
+	xdata uint16 value;
+	value = getNextByte();
+	value <<= 8;
+	value |= getNextByte();
+	return value;
+}
+
+// Shift out "numBits" bits from the CSVF stream. If "isLast", exit Shift-DR on the final bit.
+//
+static void shiftOutCsvf(xdata uint16 numBits, bool isLast) {
+	xdata uint16 bitsRemaining = (numBits-1) & 0xFFF8;        // Now an integer number of bytes
+	xdata uint8 leftOver = (uint8)(numBits - bitsRemaining);  // How many bits in last byte (1-8)
+	xdata uint16 bytesRemaining = (bitsRemaining>>3);
+	xdata uint8 tdiByte, i;
+	while ( bytesRemaining-- ) {
+		shiftOut(getNextByte());
+	}
+	tdiByte = getNextByte();  // Now do the bits in the final byte
+	i = 1;
+	while ( i && leftOver ) {
+		leftOver--;
+		if ( isLast && !leftOver ) {
+			TMS = 1; // Exit Shift-DR state on next clock
+		}
+		TDI = tdiByte & 1;
+		tdiByte >>= 1;
+		TCK = 1;
+		TCK = 0;
+		i <<= 1;
+	}
+}
+
+// Play the uncompressed CSVF stream into the JTAG port.
+//
+uint8 jtagCsvfPlay(void) {
+	xdata uint8 returnCode = 0;
+	xdata uint8 thisByte;
+	xdata uint16 numBytes;
+	xdata uint8 *ptr;
+	xdata uint8 i;
+	xdata uint16 xsdrSize = 0;  // These should be 32-bits each, but that seems a bit wasteful
+	xdata uint16 xruntest = 0;
+	xdata uint8 tdoExpected[12];
+	xdata uint8 tdoMask[12];
+	thisByte = getNextByte();
+	while ( thisByte != XCOMPLETE ) {
+		switch ( thisByte ) {
+		case XTDOMASK:
+			numBytes = bitsToBytes(xsdrSize);
+			ptr = tdoMask;
+			while ( numBytes-- ) {
+				*ptr++ = getNextByte();
+			}
+			break;
+
+		case XRUNTEST:
+			getNextByte();  // Ignore the MSW (realistically will it ever be nonzero?)
+			getNextByte();
+			xruntest = getWord();
+			break;
+
+		case XSIR:
+			jtagClockFSM(0x00000003, 4);
+			shiftOutCsvf(getNextByte(), true);
+			jtagClockFSM(0x00000001, 2);
+			if ( xruntest ) {
+				jtagClocks(xruntest);
+			}
+			break;
+
+		case XSDRSIZE:
+			xsdrSize = getWord();
+			break;
+
+		case XSDRTDO: {
+			xdata uint16 bitsRemaining = (xsdrSize-1) & 0xFFF8;        // Now an int number of bytes
+			xdata uint8 leftOver = (uint8)(xsdrSize - bitsRemaining);  // No bits in last byte (1-8)
+			xdata uint8 tdoByte, tdiByte, i, lastIndex;
+			jtagClockFSM(0x00000001, 3);
+			numBytes = bitsToBytes(xsdrSize);
+			i = 0;
+			while ( numBytes-- ) {
+				tdoExpected[i++] = getNextByte();
+			}
+			numBytes = (bitsRemaining>>3);
+			i = 0;
+			while ( numBytes-- ) {
+				tdoByte = shiftInOut(getNextByte());
+				if ( (tdoByte & tdoMask[i]) != (tdoExpected[i] & tdoMask[i]) ) {
+					returnCode = ERROR_CSVF_FAILED_COMPARE;
+					goto cleanup;
+				}
+				i++;
+			}
+			lastIndex = i;
+			tdiByte = getNextByte();  // Now do the bits in the final byte
+			tdoByte = 0x00;
+			i = 1;
+			while ( i && leftOver ) {
+				leftOver--;
+				if ( !leftOver ) {
+					TMS = 1; // Exit Shift-DR state on next clock
+				}
+				TDI = tdiByte & 1;
+				tdiByte >>= 1;
+				if ( TDO ) {
+					tdoByte |= i;
+				}
+				TCK = 1;
+				TCK = 0;
+				i <<= 1;
+			}
+			if ( (tdoByte & tdoMask[lastIndex]) != (tdoExpected[lastIndex] & tdoMask[lastIndex]) ) {
+				returnCode = ERROR_CSVF_FAILED_COMPARE;
+				goto cleanup;
+			}
+			jtagClockFSM(0x00000001, 2);
+			if ( xruntest ) {
+				jtagClocks(xruntest);
+			}
+			break;
+		}
+
+		case XSDRB:
+			jtagClockFSM(0x00000001, 3);
+			shiftOutCsvf(xsdrSize, false);
+			break;
+
+		case XSDRC:
+			shiftOutCsvf(xsdrSize, false);
+			break;
+
+		case XSDRE:
+			shiftOutCsvf(xsdrSize, true);
+			jtagClockFSM(0x00000001, 2);
+			if ( xruntest ) {
+				jtagClocks(xruntest);
+			}
+			break;
+
+		case XSTATE:
+			thisByte = getNextByte();
+			if ( thisByte == TAPSTATE_TEST_LOGIC_RESET ) {
+				jtagClockFSM(0x0000001F, 5);
+			} else {
+				if ( (0xD3A5>>thisByte) & 0x0001 ) {
+					jtagClockFSM(0x00000001, 1);
+				} else {
+					jtagClockFSM(0x00000000, 1);
+				}
+			}
+			break;
+
+		default:
+			returnCode = ERROR_CSVF_BAD_COMMAND;
+			goto cleanup;
+		}
+		thisByte = getNextByte();
+	}
+cleanup:
+	return returnCode;
 }

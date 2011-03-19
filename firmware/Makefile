@@ -32,9 +32,9 @@ CC = sdcc
 AS = asx8051
 CCFLAGS = -mmcs51 --code-size 0x3c00 --xram-size 0x0200 --xram-loc 0x3c00 -Wl"-b DSCR_AREA=0x3e00" -Wl"-b INT2JT=0x3f00"
 
-all: firmware.rel $(TARGET).hex
+all: $(TARGET).hex
 
-$(TARGET).hex: $(CC_OBJS) $(AS_OBJS)
+$(TARGET).hex: $(CC_OBJS) $(AS_OBJS) $(TARGET).rel
 	$(CC) $(CCFLAGS) -o $@ $(CC_OBJS) $(AS_OBJS) $(LIBS)
 
 %.rel: %.c
@@ -46,7 +46,18 @@ $(TARGET).hex: $(CC_OBJS) $(AS_OBJS)
 firmware.c: $(FX2LIBDIR)/fw/fw.c
 	cp $(FX2LIBDIR)/fw/fw.c firmware.c
 
+
+$(TARGET).iic: $(TARGET).hex
+	fx2loader $< $@
+
+eeprom.iic: $(TARGET).iic ../vhdl/TopLevel.csvf
+	cat $+ > $@
+
+eeprom: eeprom.iic
+	sudo fx2loader $< eeprom
+
+
 clean: FORCE
-	rm -f *.asm *.hex *.lnk *.lst *.map *.mem *.rel *.rst *.sym firmware.c
+	rm -f *.iic *.asm *.hex *.lnk *.lst *.map *.mem *.rel *.rst *.sym firmware.c
 
 FORCE:

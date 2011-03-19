@@ -18,13 +18,13 @@
 #include <fx2macros.h>
 #include <types.h>
 
-static uint8 currentByte;
+static xdata uint8 currentByte;
 
 // Wait for the I2C interface to complete the current send or receive operation. Return true if
 // there was a bus error, else return false if the operation completed successfully.
 //
-static bool promWaitForDone() {
-	uint8 i;
+static bool promWaitForDone(void) {
+	xdata uint8 i;
 	while ( !((i = I2CS) & bmDONE) );  // Poll the done bit
 	if ( i & bmBERR ) {
 		return true;
@@ -37,8 +37,8 @@ static bool promWaitForDone() {
 // bus error or the slave failed to acknowledge receipt of the byte, else return false if the
 // operation completed successfully.
 //
-static bool promWaitForAck() {
-	uint8 i;
+static bool promWaitForAck(void) {
+	xdata uint8 i;
 	while ( !((i = I2CS) & bmDONE) );  // Poll the done bit
 	if ( i & bmBERR ) {
 		return true;
@@ -58,6 +58,7 @@ uint8 promPeekByte() {
 // Read the next EEPROM byte so it can be peeked.
 //
 bool promNextByte(void) {
+	
 	// Now get the actual data
 	//
 	if ( promWaitForDone() ) {
@@ -70,8 +71,9 @@ bool promNextByte(void) {
 
 // Start a read operation at the specified address. The first byte is read so it can be peeked.
 //
-bool promStartRead(uint16 addr) {
-	uint8 i;
+bool promStartRead(xdata uint16 addr) {
+	xdata uint8 i;
+
 	// Wait for I2C idle
 	//
 	while ( I2CS & bmSTOP );
@@ -113,7 +115,7 @@ bool promStartRead(uint16 addr) {
 // Stop the current read operation.
 //
 bool promStopRead(void) {
-	uint8 i;
+	xdata uint8 i;
 	// Wait for current operation to finish
 	//
 	if ( promWaitForDone() ) {
@@ -134,8 +136,8 @@ bool promStopRead(void) {
 
 // Read "length" bytes from address "addr" in the attached EEPROM, and write them to RAM at "buf".
 //
-bool promRead(uint16 addr, uint8 length, uint8 xdata *buf) {
-	uint8 i;
+bool promRead(xdata uint16 addr, xdata uint8 length, xdata uint8 *buf) {
+	xdata uint8 i;
 	
 	// Wait for I2C idle
 	//
@@ -202,8 +204,8 @@ bool promRead(uint16 addr, uint8 length, uint8 xdata *buf) {
 
 // Read "length" bytes from RAM at "buf", and write them to the attached EEPROM at address "addr".
 //
-bool promWrite(uint16 addr, uint8 length, const uint8 xdata *buf) {
-	uint8 i;
+bool promWrite(xdata uint16 addr, xdata uint8 length, const xdata uint8 *buf) {
+	xdata uint8 i;
 
 	// Wait for I2C idle
 	//

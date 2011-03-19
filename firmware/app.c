@@ -26,28 +26,31 @@
 #include "defs.h"
 
 // Function declarations
-void fifoSendPromData(uint32 bytesToSend);
+void fifoSendPromData(xdata uint32 bytesToSend);
 
 // The USB vendor commands
 #define CMD_CALCULATOR_TEST   0x90
+#define CMD_GET_DIAG_CODE     0x91
 #define CMD_READ_WRITE_EEPROM 0xA2
+
+xdata uint8 m_diagnosticCode = 0;
 
 // Called once at startup
 //
 void mainInit(void) {
 
-	uint8 thisByte = 0xFF;
-	uint16 blockSize;
+	xdata uint8 thisByte = 0xFF;
+	xdata uint16 blockSize;
 
 	// Global settings
 	SYNCDELAY; REVCTL = (bmDYN_OUT | bmENH_PKT);
 	SYNCDELAY; CPUCS = bmCLKSPD1;  // 48MHz
 
 	// Check if the FPGA is running (it drives "10" on fifoAddr)
-	SYNCDELAY; IFCONFIG = 0x00;
-	if ( (IOA & (bmBIT4|bmBIT5)) == (bmBIT4|bmBIT5) ) {
-		thisByte = 0x00;  // The FPGA is not running
-	}
+	//SYNCDELAY; IFCONFIG = 0x00;
+	//if ( (IOA & (bmBIT4|bmBIT5)) == (bmBIT4|bmBIT5) ) {
+	//	thisByte = 0x00;  // The FPGA is not running
+	//}
 
 	// Drive IFCLK at 48MHz, enable slave FIFOs
 	SYNCDELAY; IFCONFIG = (bmIFCLKSRC | bm3048MHZ | bmIFCLKOE | bmFIFOS);
@@ -96,57 +99,58 @@ void mainInit(void) {
 
 	// If the FPGA is active, find the end of the FX2 code in the EEPROM and then send some of the
 	// following data to the FPGA
-	if ( thisByte ) {
-		promStartRead(0x0000);
-		if ( promPeekByte() == 0xC2 ) {
-			promNextByte();    // VID(L)
-			promNextByte();    // VID(H)
-			promNextByte();    // PID(L)
-			promNextByte();    // PID(H)
-			promNextByte();    // DID(L)
-			promNextByte();    // DID(H)
-			promNextByte();    // Config byte
-	
-			promNextByte();    // Length(H)
-			thisByte = promPeekByte();
-			while ( !(thisByte & 0x80) ) {
-				blockSize = thisByte;
-				blockSize <<= 8;
-
-				promNextByte();  // Length(L)
-				blockSize |= promPeekByte();
-
-				blockSize += 2;  // Space taken by address
-				while ( blockSize-- ) {
-					promNextByte();
-				}
+	//if ( thisByte ) {
+	promStartRead(0x0000);
+	if ( promPeekByte() == 0xC2 ) {
+		promNextByte();    // VID(L)
+		promNextByte();    // VID(H)
+		promNextByte();    // PID(L)
+		promNextByte();    // PID(H)
+		promNextByte();    // DID(L)
+		promNextByte();    // DID(H)
+		promNextByte();    // Config byte
 		
-				promNextByte();  // Length(H)
-				thisByte = promPeekByte();
+		promNextByte();    // Length(H)
+		thisByte = promPeekByte();
+		while ( !(thisByte & 0x80) ) {
+			blockSize = thisByte;
+			blockSize <<= 8;
+			
+			promNextByte();  // Length(L)
+			blockSize |= promPeekByte();
+			
+			blockSize += 2;  // Space taken by address
+			while ( blockSize-- ) {
+				promNextByte();
 			}
-			promNextByte();    // Length(L)
-			promNextByte();    // Address(H)
-			promNextByte();    // Address(L)
-			promNextByte();    // Last byte
-	
-			// Send the next 2071 bytes to the FPGA
-			promNextByte();    // First byte of FIFO data
-			fifoSendPromData(2071);
+			
+			promNextByte();  // Length(H)
+			thisByte = promPeekByte();
 		}
-		promStopRead();
+		promNextByte();    // Length(L)
+		promNextByte();    // Address(H)
+		promNextByte();    // Address(L)
+		promNextByte();    // Last byte
+		promNextByte();    // First byte after the end of the firmware
+				
+		// Send the next 2071 bytes to the FPGA
+		//fifoSendPromData(2071);
 	}
+	jtagCsvfInit();
+	m_diagnosticCode = jtagCsvfPlay();
+	promStopRead();
 }
 
 // Called repeatedly while the device is idle
 //
 void mainLoop(void) {
 	// If there is a JTAG shift operation pending, execute it now.
-	jtagExecuteShift();
+	jtagShiftExecute();
 }
 
 // Called when a vendor command is received
 //
-uint8 handleVendorCommand(uint8 cmd) {
+uint8 handleVendorCommand(xdata uint8 cmd) {
 	switch(cmd) {
 		// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
 		//
@@ -154,7 +158,7 @@ uint8 handleVendorCommand(uint8 cmd) {
 			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 				EP0BCL = 0x00;                                     // Allow host transfer in
 				while ( EP0CS & bmEPBUSY );                        // Wait for data
-				jtagBeginShift(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
+				jtagShiftBegin(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
 				// Now that numBits & flagByte are set, this operation will continue in mainLoop()...
 			} else {
 				// Unrecognised operation
@@ -191,9 +195,9 @@ uint8 handleVendorCommand(uint8 cmd) {
 	//
 	case CMD_CALCULATOR_TEST:
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
-			uint16 num1 = SETUP_VALUE();
-			uint16 num2 = SETUP_INDEX();
-			uint16 *outArray = (uint16 *)EP0BUF;
+			xdata uint16 num1 = SETUP_VALUE();
+			xdata uint16 num2 = SETUP_INDEX();
+			xdata uint16 *outArray = (xdata uint16 *)EP0BUF;
 
 			// It's an IN operation - prepare the response and send it
 			while ( EP0CS & bmEPBUSY );
@@ -210,15 +214,33 @@ uint8 handleVendorCommand(uint8 cmd) {
 		}
 		break;
 
+	// Fetch the diagnostic code, so host can query what went wrong.
+	//
+	case CMD_GET_DIAG_CODE:
+		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
+			xdata uint16 *outArray = (xdata uint16 *)EP0BUF;
+
+			// It's an IN operation - prepare the response and send it
+			while ( EP0CS & bmEPBUSY );
+			*EP0BUF = m_diagnosticCode;
+			EP0BCH = 0;
+			SYNCDELAY;
+			EP0BCL = 1;
+		} else {
+			// This command does not support OUT operations
+			return false;
+		}
+		break;
+
 	// Command to talk to the EEPROM
 	//
 	case CMD_READ_WRITE_EEPROM:
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
 			// It's an IN operation - read from prom and send to host
-			uint16 address = SETUP_VALUE();
-			uint16 length = SETUP_LENGTH();
-			uint16 chunkSize;
-			uint8 i;
+			xdata uint16 address = SETUP_VALUE();
+			xdata uint16 length = SETUP_LENGTH();
+			xdata uint16 chunkSize;
+			xdata uint8 i;
 			while ( length ) {
 				while ( EP0CS & bmEPBUSY );
 				chunkSize = length < EP0BUF_SIZE ? length : EP0BUF_SIZE;
@@ -234,9 +256,9 @@ uint8 handleVendorCommand(uint8 cmd) {
 			}
 		} else if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 			// It's an OUT operation - read from host and send to prom
-			uint16 address = SETUP_VALUE();
-			uint16 length = SETUP_LENGTH();
-			uint16 chunkSize;
+			xdata uint16 address = SETUP_VALUE();
+			xdata uint16 length = SETUP_LENGTH();
+			xdata uint16 chunkSize;
 			while ( length ) {
 				EP0BCL = 0x00; // allow pc transfer in
 				while ( EP0CS & bmEPBUSY ); // wait for data
@@ -258,10 +280,10 @@ uint8 handleVendorCommand(uint8 cmd) {
 
 // Compose a packet to send on the EP6 FIFO, and commit it.
 //
-void fifoSendPromData(uint32 bytesToSend) {
+void fifoSendPromData(xdata uint32 bytesToSend) {
 	
-	uint16 i, chunkSize;
-	uint8 thisByte;
+	xdata uint16 i, chunkSize;
+	xdata uint8 thisByte;
 
 	while ( bytesToSend ) {
 		chunkSize = (bytesToSend >= 512) ? 512 : (uint16)bytesToSend;
