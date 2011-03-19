@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2009-2010 Chris McClelland
+ * Copyright (C) 2011 Chris McClelland
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,16 +14,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef NERO_H
-#define NERO_H
+#ifndef LIBNERO_H
+#define LIBNERO_H
 
 #include <types.h>
 
-#define NERO_ERR_MAXLENGTH 512
-#define ENDPOINT_SIZE 512
+// Various defines...
 #define ZEROS (const uint8*)NULL
 #define ONES (const uint8*)-1
 
+// Possible return codes
 typedef enum {
 	NERO_SUCCESS,
 	NERO_USB_INIT,
@@ -34,25 +34,6 @@ typedef enum {
 	NERO_SEND,
 	NERO_RECEIVE
 } NeroStatus;
-
-typedef enum {
-	SEND_ZEROS,
-	SEND_ONES,
-	SEND_DATA,
-	SEND_MASK
-} SendType;
-
-enum {
-	IS_RESPONSE_NEEDED = 0,
-	IS_LAST = 1,
-	SEND_TYPE = 2
-};
-
-enum {
-	CMD_CLOCK_DATA = 0x80,
-	CMD_CLOCK_STATE_MACHINE,
-	CMD_CLOCK
-};
 
 #ifdef __cplusplus
 extern "C" {

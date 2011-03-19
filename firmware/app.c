@@ -1,7 +1,5 @@
 /* 
- * Copyright (C) 2009-2011 Chris McClelland
- *
- * Copyright (C) 2009 Ubixum, Inc.
+ * Copyright (C) 2011 Chris McClelland
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -152,44 +150,44 @@ void mainLoop(void) {
 //
 uint8 handleVendorCommand(uint8 cmd) {
 	switch(cmd) {
-		// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
-		//
-		case CMD_NEROJTAG_CLOCK_DATA:
-			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				EP0BCL = 0x00;                                     // Allow host transfer in
-				while ( EP0CS & bmEPBUSY );                        // Wait for data
-				jtagShiftBegin(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
-				// Now that numBits & flagByte are set, this operation will continue in mainLoop()...
-			} else {
-				// Unrecognised operation
-				return false;
-			}
-			break;
-
-		// Clock an (up to) 32-bit pattern LSB-first into TMS to change JTAG TAP states
-		//
-		case CMD_NEROJTAG_CLOCK_FSM:
-			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				EP0BCL = 0x00;                                   // Allow host transfer in
-				while ( EP0CS & bmEPBUSY );                      // Wait for data
-				jtagClockFSM(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Bit pattern, transitionCount
-			} else {
-				// This command does not support OUT operations
-				return false;
-			}
-			break;
-
-		// Execute a number of JTAG clocks.
-		//
-		case CMD_NEROJTAG_CLOCK:
-			if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-				jtagClocks(*((uint32 *)(SETUPDAT+2)));
-			} else {
-				// This command does not support OUT operations
-				return false;
-			}
-			break;
-
+	// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
+	//
+	case CMD_NEROJTAG_CLOCK_DATA:
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+			EP0BCL = 0x00;                                     // Allow host transfer in
+			while ( EP0CS & bmEPBUSY );                        // Wait for data
+			jtagShiftBegin(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
+			// Now that numBits & flagByte are set, this operation will continue in mainLoop()...
+		} else {
+			// Unrecognised operation
+			return false;
+		}
+		break;
+		
+	// Clock an (up to) 32-bit pattern LSB-first into TMS to change JTAG TAP states
+	//
+	case CMD_NEROJTAG_CLOCK_FSM:
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+			EP0BCL = 0x00;                                   // Allow host transfer in
+			while ( EP0CS & bmEPBUSY );                      // Wait for data
+			jtagClockFSM(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Bit pattern, transitionCount
+		} else {
+			// This command does not support OUT operations
+			return false;
+		}
+		break;
+		
+	// Execute a number of JTAG clocks.
+	//
+	case CMD_NEROJTAG_CLOCK:
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+			jtagClocks(*((uint32 *)(SETUPDAT+2)));
+		} else {
+			// This command does not support OUT operations
+			return false;
+		}
+		break;
+		
 	// Simple example command which does the four arithmetic operations on the data from
 	// the host, and sends the results back to the host
 	//

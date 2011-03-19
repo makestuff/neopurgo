@@ -1,16 +1,14 @@
-# cd hermes
-# cd host && make clean && make && cd ..\firmware && make clean && make && cd ..\xilprg && build.bat && cd ..
-# fx2loader firmware/firmware.hex
-# xilprg vhdl/fx2fpga.bit
-# host\Debug\host.exe
-Read 10 bytes from endpoint 8:  A9 A9 A9 A9 A9 A9 A9 A9 A9 A9
-# host\Debug\host.exe -i
-> 01
-Writing:  01
-> 01
-Writing:  01
-> q
-#
+An FX2LP firmware and various host tools and libraries to make it easier to:
 
-// Execute the calc command:
-# ucm -v 0x04B4 -p 0x8613 -i 0x90 0x0010 0x0002 0x0008 | hxd
+   * Bootstrap an FPGA design using minimal components
+   * Reprogram the FPGA over USB
+   * Communicate with the FPGA using HiSpeed USB (~25Mbyte/s)
+
+
+firmware  - FX2LP firmware, including FPGA bootload & NeroJTAG capability
+xsvf2csvf - Convert a Xilinx XSVF file into the compressed CSVF format
+csvfplay  - Play a CSVF file using a NeroJTAG-capable device
+xilprg    - A fork of Zoltán Csizmadia's xilprg, with NeroJTAG capability
+libnero   - Host-side implementation of the NeroJTAG protocol
+vhdl      - Example FPGA design
+host      - Host-side tool for interacting with the example FPGA design

@@ -21,9 +21,29 @@
 static UsbDeviceHandle *m_deviceHandle = NULL;
 extern char m_neroErrorMessage[];
 
+#define ENDPOINT_SIZE 512
 #define fail(x) returnCode = x; goto cleanup
 #define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
 #define checkReturn() if ( status ) { return status; }
+
+typedef enum {
+	SEND_ZEROS,
+	SEND_ONES,
+	SEND_DATA,
+	SEND_MASK
+} SendType;
+
+enum {
+	IS_RESPONSE_NEEDED = 0,
+	IS_LAST = 1,
+	SEND_TYPE = 2
+};
+
+enum {
+	CMD_CLOCK_DATA = 0x80,
+	CMD_CLOCK_STATE_MACHINE,
+	CMD_CLOCK
+};
 
 static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, bool isResponseNeeded);
 static NeroStatus doSend(const uint8 *sendPtr, uint16 chunkSize);

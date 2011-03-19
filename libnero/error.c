@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2009-2010 Chris McClelland
+ * Copyright (C) 2009-2011 Chris McClelland
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,13 @@
  */
 #include "libnero.h"
 
+// Maximum length for an error message
+#define NERO_ERR_MAXLENGTH 512
+
 // Space for an error message
-//
 char m_neroErrorMessage[NERO_ERR_MAXLENGTH];
 
 // Get the last error message, or junk if no error occurred.
-//
 const char *neroStrError(void) {
 	return m_neroErrorMessage;
 }
