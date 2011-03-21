@@ -54,7 +54,7 @@ eeprom.iic: $(TARGET).iic ../vhdl/TopLevel.csvf
 	cat $+ > $@
 
 eeprom: eeprom.iic
-	sudo fx2loader $< eeprom
+	fx2loader $< eeprom
 
 
 clean: FORCE
