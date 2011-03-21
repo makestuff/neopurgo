@@ -16,7 +16,7 @@
 #
 
 all: FORCE
-	vcbuild /nologo libnero.vcproj
+	vcbuild /nologo csvfplay.vcproj
 
 clean: FORCE
 	rm -rf Release Debug *.ncb *.suo *.user

@@ -117,8 +117,8 @@ int main(int argc, char *argv[]) {
 	if ( intOpt->count ) {
 		usb_clear_halt(deviceHandle, USB_ENDPOINT_OUT | outEndpoint);
 		usb_clear_halt(deviceHandle, USB_ENDPOINT_IN | inEndpoint);
-		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (const char *)&nop, 1, 1000);
-		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (const char *)&nop, 1, 1000);
+		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char *)&nop, 1, 1000);
+		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char *)&nop, 1, 1000);
 		//returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 1000);
 		//returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 1000);
 		for (  ; ; ) {
@@ -372,6 +372,22 @@ int main(int argc, char *argv[]) {
 		}
 	} else {
 		// Ugly hack to clear any blockages
+		uint8 count = 0;
+		do {
+			byteBuf[0] = 0xFE;
+			usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)byteBuf, 1, 100);
+			returnCode = usb_bulk_read(
+				deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 100);
+			count++;
+		} while ( returnCode < 0 && count < 10 );
+
+		if ( count == 10 ) {
+			printf("Failed to sync with FPGA\n");
+			exitCode = 100;
+			goto cleanup;
+		}
+
+/*
 		usb_clear_halt(deviceHandle, USB_ENDPOINT_OUT | outEndpoint);
 		usb_clear_halt(deviceHandle, USB_ENDPOINT_IN | inEndpoint);
 		do {
@@ -384,7 +400,7 @@ int main(int argc, char *argv[]) {
 			returnCode = usb_bulk_read(
 				deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 100);
 		} while ( returnCode < 0 );
-
+*/
 		//returnCode = usb_control_msg(
 		//	deviceHandle,
 		//	USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,

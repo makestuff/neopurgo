@@ -201,6 +201,7 @@ NeroStatus neroClocks(uint32 numClocks) {
 //
 static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, bool isResponseNeeded) {
 	uint16 wValue = 0x0000;
+	int returnCode;
 	if ( isLast ) {
 		wValue |= (1<<IS_LAST);
 	}
@@ -208,7 +209,7 @@ static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, boo
 		wValue |= (1<<IS_RESPONSE_NEEDED);
 	}
 	wValue |= sendType << SEND_TYPE;
-	int returnCode = usb_control_msg(
+	returnCode = usb_control_msg(
 		m_deviceHandle,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		CMD_CLOCK_DATA,  // bRequest

@@ -372,9 +372,5 @@ cleanup:
 	bufDestroy(&csvfBuf);
 	bufDestroy(&swapBuf);
 	bufDestroy(&m_xsvfBuf);
-
-	if ( returnCode ) {
-		fprintf(stderr, "Failed returnCode %d\n", returnCode);
-	}
 	return returnCode;
 }

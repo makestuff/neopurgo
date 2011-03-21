@@ -45,8 +45,8 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories=".\src,../../../3rd/libusb-win32-bin-1.2.2.0/include"
-				PreprocessorDefinitions="NDEBUG;WIN32;_CONSOLE;NATIVE_WIN32"
+				AdditionalIncludeDirectories=".\src,../../../include,../../../libs/usbwrap,../libnero,../../../3rd/libusb-win32-bin-1.2.2.0/include"
+				PreprocessorDefinitions="NDEBUG;WIN32;_CONSOLE;NATIVE_WIN32;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -70,7 +70,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
+				AdditionalDependencies="../libnero/Release/libnero.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				OutputFile=".\obj\win32\Release/xilprg.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
@@ -134,8 +134,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\src,../../../3rd/libusb-win32-bin-1.2.2.0/include"
-				PreprocessorDefinitions="_DEBUG;WIN32;_CONSOLE;NATIVE_WIN32"
+				AdditionalIncludeDirectories=".\src,../../../include,../../../libs/usbwrap,../libnero,../../../3rd/libusb-win32-bin-1.2.2.0/include"
+				PreprocessorDefinitions="_DEBUG;WIN32;_CONSOLE;NATIVE_WIN32;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -160,7 +160,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
+				AdditionalDependencies="../libnero/Debug/libnero.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				OutputFile=".\obj\win32\Debug/xilprg.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="true"

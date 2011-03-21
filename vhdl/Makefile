@@ -7,6 +7,12 @@ ifeq ($(PLATFORM),s3board)
 	FPGA = xc3s200-ft256-4
 endif
 
+ifeq ($(OS),Windows_NT)
+	XSVF2CSVF = ../xsvf2csvf/Release/xsvf2csvf.exe
+else
+	XSVF2CSVF = ../xsvf2csvf/xsvf2csvf
+endif
+
 all: $(TOP_LEVEL).csvf
 
 xsvf: $(TOP_LEVEL).xsvf
@@ -15,8 +21,8 @@ csvf: $(TOP_LEVEL).csvf
 
 report: $(TOP_LEVEL).twr
 
-$(TOP_LEVEL).csvf: $(TOP_LEVEL).xsvf ../xsvf2csvf/xsvf2csvf
-	../xsvf2csvf/xsvf2csvf $< $@
+$(TOP_LEVEL).csvf: $(TOP_LEVEL).xsvf $(XSVF2CSVF)
+	$(XSVF2CSVF) $< $@
 
 # This assumes that the "XILINX" environment variable is set 
 $(TOP_LEVEL).xsvf: $(PLATFORM).batch $(TOP_LEVEL).bit
