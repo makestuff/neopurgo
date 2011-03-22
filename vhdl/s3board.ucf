@@ -82,6 +82,15 @@ NET "anode_out<1>"    LOC = "G14";
 NET "anode_out<2>"    LOC = "F14";
 NET "anode_out<3>"    LOC = "E13";
 
+NET "sw_in<0>"        LOC = "F12";   # SW0
+NET "sw_in<1>"        LOC = "G12";   # SW1
+NET "sw_in<2>"        LOC = "H14";   # SW2
+NET "sw_in<3>"        LOC = "H13";   # SW3
+NET "sw_in<4>"        LOC = "J14";   # SW4
+NET "sw_in<5>"        LOC = "J13";   # SW5
+NET "sw_in<6>"        LOC = "K14";   # SW6
+NET "sw_in<7>"        LOC = "K13";   # SW7
+
 #========================================================
 # Timing constraint of S3 50-MHz onboard oscillator
 # name of the clock signal is clk

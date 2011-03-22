@@ -28,6 +28,7 @@
 // Function declarations
 void fifoSendPromData(uint32 bytesToSend);
 
+// General-purpose diagnostic code, for debugging. See CMD_GET_DIAG_CODE vendor command.
 xdata uint8 m_diagnosticCode = 0;
 
 // Called once at startup
@@ -127,13 +128,10 @@ void mainInit(void) {
 		promNextByte();    // Address(L)
 		promNextByte();    // Last byte
 		promNextByte();    // First byte after the end of the firmware
-				
-		// Send the next 2071 bytes to the FPGA
-		//fifoSendPromData(2071);
 	}
 	jtagCsvfInit();
 	m_diagnosticCode = jtagCsvfPlay();
-	fifoSendPromData(2071);
+	fifoSendPromData(5+2071);  // Five command bytes, 2071 data bytes
 	promStopRead();
 }
 

@@ -50,7 +50,7 @@ firmware.c: $(FX2LIBDIR)/fw/fw.c
 $(TARGET).iic: $(TARGET).hex
 	fx2loader $< $@
 
-eeprom.iic: $(TARGET).iic ../vhdl/TopLevel.csvf random.dat
+eeprom.iic: $(TARGET).iic ../vhdl/TopLevel.csvf command.dat random.dat
 	cat $+ > $@
 
 eeprom: eeprom.iic

@@ -67,7 +67,6 @@ int main(int argc, char *argv[]) {
 	UsbDeviceHandle *deviceHandle = NULL;
 	int returnCode;
 	uint16 vid, pid;
-	uint8 nop = 0xFF;
 	//uint32 i;
 	char lineBuf[1026];
 	char *linePtr;
@@ -122,12 +121,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	if ( intOpt->count ) {
-		usb_clear_halt(deviceHandle, USB_ENDPOINT_OUT | outEndpoint);
-		usb_clear_halt(deviceHandle, USB_ENDPOINT_IN | inEndpoint);
-		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char *)&nop, 1, 1000);
-		returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char *)&nop, 1, 1000);
-		//returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 1000);
-		//returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 1000);
 		for (  ; ; ) {
 			printf("> ");
 			if ( !fgets(lineBuf, 1026, stdin) ) {
@@ -360,11 +353,7 @@ int main(int argc, char *argv[]) {
 					printf("Expected to write %d bytes to endpoint %d but actually wrote %d: %s\n", byteCount, outEndpoint, returnCode, usb_strerror());
 					continue;
 				}
-				//if ( byteBuf[0] & 0x80 ) {
-				if ( byteBuf[0] == 0xfe ) {
-					//printf("Sleeping...\n");
-					//Sleep(2000);
-					//printf("...done\n");
+				if ( byteBuf[0] & 0x80 ) {
 					returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
 					if ( returnCode > 0 ) {
 						printf("Read %d bytes from endpoint %d: ", returnCode, inEndpoint);

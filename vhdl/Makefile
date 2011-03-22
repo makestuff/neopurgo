@@ -1,6 +1,7 @@
 TOP_LEVEL = TopLevel
 PLATFORM = s3board
 VHDLS = \
+	$(TOP_LEVEL).vhdl \
 	SevenSeg.vhdl
 
 ifeq ($(PLATFORM),s3board)
@@ -50,7 +51,7 @@ $(TOP_LEVEL).ngc: $(PLATFORM).xst $(TOP_LEVEL).prj
 	xst -intstyle ise -ifn $< -ofn $(TOP_LEVEL).syr
 
 $(TOP_LEVEL).prj: $(VHDLS)
-	for i in $(TOP_LEVEL).vhdl $+; do echo "vhdl work \"$$i\""; done > $@
+	for i in $+; do echo "vhdl work \"$$i\""; done > $@
 
 clean: FORCE
 	rm -rf *.xsvf *.csvf _ngo *.bgn *.drc *.ncd *.ntrc_log *.prj *.twr *.csv *.html fx2fpga_xdb _xmsgs *.bit *.gise *.ngc *.pad *.ptwx *.twx *.ngm *.txt *.xml *.xrpt *.bld *.ise *.ngd *.par *.stx *.map *.twr auto_project_xdb *.cmd_log *.lso *.ngr *.pcf *.syr *.unroutes *.xpi *.mrp xst *.log *.cmd *.xwbt iseconfig xlnx_auto_0_xdb
