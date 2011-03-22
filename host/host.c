@@ -150,126 +150,10 @@ int main(int argc, char *argv[]) {
 				printf("  8300000001\n");
 				printf("Read register 0x00 twice:\n");
 				printf("  8000000002\n");
-				printf("Write file small.dat to register 0x00:\n");
-				printf("  /00 small.dat\n");
-				printf("Write file r1024.dat to register 0x01:\n");
-				printf("  /01 r1024.dat\n");
+				printf("Write file ../firmware/random.dat to register 0x00:\n");
+				printf("  /00 ../firmware/random.dat\n");
 			} else if ( *linePtr == 'q' ) {
 				break;
-			} else if ( *linePtr == 'x' ) {
-				if ( linePtr[1] == 'd' ) {
-					// -----------------------------------------------------
-					// Need to send data
-					const char *text = "Nor have we been wanting in attention to our British brethren. We have warned them from time to time of attempts by their legislature to extend an unwarrantable jurisdiction over us. We have reminded them of the circumstances of our emigration and settlement here. We have appealed to their native justice and magnanimity, and we have conjured them by the ties of our common kindred to disavow these usurpations, which, would inevitably interrupt our connections and correspondence. They too have been deaf to the voice of justice and of consanguinity. We must, therefore, acquiesce in the necessity, which denounces our separation, and hold them, as we hold the rest of mankind, enemies in war, in peace friends.";
-					const char *ptr = text;
-					int numBytes = strlen(text);
-					uint16 chunkSize;
-					u.lword = (numBytes<<3);
-					if ( linePtr[2] == 'r' ) {
-						// Need to send data, and need a response
-						numBytes = 9;
-						u.lword = numBytes*8 - 2;
-						returnCode = usb_control_msg(
-							deviceHandle,
-							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, (bmSENDDATA | bmNEEDRESPONSE), 0x0000, (char*)u.bytes, 4, 5000
-						);
-						if ( returnCode != 4 ) {
-							printf("Error whilst sending control message: %s\n", usb_strerror());
-							continue;
-						}
-		
-						do {
-							chunkSize = (numBytes>=ENDPOINT_SIZE) ? ENDPOINT_SIZE : (uint16)numBytes;
-							memcpy(byteBuf, ptr, chunkSize);
-							ptr += chunkSize;
-							numBytes -= chunkSize;
-							returnCode = usb_bulk_write(
-								deviceHandle, USB_ENDPOINT_OUT | 2, (char*)byteBuf, chunkSize, 1000);
-							if ( returnCode != chunkSize ) {
-								printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
-								continue;
-							}
-							byteBuf[chunkSize] = 0x00;
-							printf("Wrote %d bytes to endpoint 2: \"%s\"\n", chunkSize, byteBuf);
-							returnCode = usb_bulk_read(
-								deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, chunkSize, 1000);
-							if ( returnCode != chunkSize ) {
-								printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
-								continue;
-							}
-							byteBuf[chunkSize] = 0x00;
-							//printf("Read %d bytes from endpoint 4: \"%s\"\n", returnCode, byteBuf);
-							printf("Read %d bytes from endpoint 4: ", returnCode);
-							dumpSimple(byteBuf, returnCode);
-							printf("\n");
-						} while ( numBytes );
-					} else {
-						// Need to send data, but no response is needed
-						returnCode = usb_control_msg(
-							deviceHandle,
-							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, bmSENDDATA, 0x0000, (char*)u.bytes, 4, 5000
-						);
-						if ( returnCode != 4 ) {
-							printf("Error whilst sending control message: %s\n", usb_strerror());
-							continue;
-						}
-						returnCode = usb_bulk_write(
-							deviceHandle, USB_ENDPOINT_OUT | 2, (char*)text, numBytes, 1000);
-						if ( returnCode != numBytes ) {
-							printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
-							continue;
-						}
-						printf("Wrote %d bytes to endpoint 2: \"%s\"\n", numBytes, text);
-					}
-				} else {
-					// -----------------------------------------------------
-					// Not sending
-					u.lword = (400<<3);
-					if ( linePtr[2] == 'r' ) {
-						// Not sending data, but a response is needed
-						returnCode = usb_control_msg(
-							deviceHandle,
-							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, (bmSENDZEROS | bmNEEDRESPONSE), 0x0000, (char*)u.bytes, 4, 5000
-						);
-						if ( returnCode != 4 ) {
-							printf("Error whilst sending control message: %s\n", usb_strerror());
-							continue;
-						}
-						returnCode = usb_bulk_read(
-							deviceHandle, USB_ENDPOINT_IN | 4, (char*)byteBuf, 400, 1000);
-						if ( returnCode != 400 ) {
-							printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
-							continue;
-						}
-						printf("Read %d bytes from endpoint 4: ", returnCode);
-						dumpSimple(byteBuf, returnCode);
-						printf("\n");
-					} else {
-						// Not sending data, no response is needed
-						returnCode = usb_control_msg(
-							deviceHandle,
-							USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-							0x80, bmSENDZEROS, 0x0000, (char*)u.bytes, 4, 5000
-						);
-						if ( returnCode != 4 ) {
-							printf("Error whilst sending control message: %s\n", usb_strerror());
-							continue;
-						}
-					}
-				}
-			} else if ( *linePtr == 'r' ) {
-				returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
-				if ( returnCode > 0 ) {
-					printf("Read %d bytes from endpoint %d: ", returnCode, inEndpoint);
-					dumpSimple(byteBuf, returnCode);
-					printf("\n");
-				} else if ( returnCode < 0 ) {
-					printf("Error whilst reading from endpoint %d: %s\n", inEndpoint, usb_strerror());
-					continue;
-				}
 			} else if ( *linePtr == '/' ) {
 				while ( *linePtr != '\n' ) {
 					linePtr++;
@@ -307,8 +191,13 @@ int main(int argc, char *argv[]) {
 					fclose(inFile);
 					continue;
 				}
+				u.lword = fileLen;
+				highNibble &= 0x07;
 				buffer[0] = (highNibble << 4) | lowNibble;
-				*((uint32 *)(buffer+1)) = fileLen;
+				buffer[1] = u.bytes[3];
+				buffer[2] = u.bytes[2];
+				buffer[3] = u.bytes[1];
+				buffer[4] = u.bytes[0];
 				if ( fread(buffer+5, 1, fileLen, inFile) != fileLen ) {
 					fprintf(stderr, "Unable to read file \"%s\"\n", lineBuf+4);
 					fclose(inFile);
