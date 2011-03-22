@@ -67,7 +67,6 @@ int main(int argc, char *argv[]) {
 	UsbDeviceHandle *deviceHandle = NULL;
 	int returnCode;
 	uint16 vid, pid;
-	//uint32 i;
 	char lineBuf[1026];
 	char *linePtr;
 	uint8 byteBuf[513];
@@ -78,6 +77,17 @@ int main(int argc, char *argv[]) {
 		uint32 lword;
 		uint8 bytes[4];
 	} u;
+	double totalTime, speed;
+	uint16 checksum;
+	#ifdef WIN32
+		LARGE_INTEGER tvStart, tvEnd, freq;
+		DWORD_PTR mask = 1;
+		SetThreadAffinityMask(GetCurrentThread(), mask);
+		QueryPerformanceFrequency(&freq);
+	#else
+		struct timeval tvStart, tvEnd;
+		long long startTime, endTime;
+	#endif
 
 	if ( arg_nullcheck(argTable) != 0 ) {
 		printf("%s: insufficient memory\n", progName);
@@ -155,6 +165,7 @@ int main(int argc, char *argv[]) {
 			} else if ( *linePtr == 'q' ) {
 				break;
 			} else if ( *linePtr == '/' ) {
+				uint32 i;
 				while ( *linePtr != '\n' ) {
 					linePtr++;
 				}
@@ -204,18 +215,48 @@ int main(int argc, char *argv[]) {
 					free(buffer);
 					continue;
 				}
-				printf("Writing %d bytes:", byteCount);
+				checksum = 0x0000;
+				for ( i = 0; i < fileLen; i++  ) {
+					checksum += buffer[5+i];
+				}
+				printf("Writing five command bytes followed by %d data bytes:", fileLen);
 				dumpSimple(buffer, 6);
 				printf(" ...");
 				dumpSimple(buffer+byteCount-1, 1);
 				printf("\n");
-				returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)buffer, byteCount, 5000);
+				#ifdef WIN32
+					QueryPerformanceCounter(&tvStart);
+					returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)buffer, byteCount, 5000);
+					QueryPerformanceCounter(&tvEnd);
+				#else
+					gettimeofday(&tvStart, NULL);
+					returnCode = usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)buffer, byteCount, 5000);
+					gettimeofday(&tvEnd, NULL);
+				#endif
 				if ( returnCode != byteCount ) {
 					printf("Expected to write %d bytes to endpoint %d but actually wrote %d: %s\n", byteCount, outEndpoint, returnCode, usb_strerror());
 					fclose(inFile);
 					free(buffer);
 					continue;
 				}
+				#ifdef WIN32
+					totalTime = (double)(tvEnd.QuadPart - tvStart.QuadPart);
+					totalTime /= freq.QuadPart;
+					printf("Time: %fms\n", totalTime*1000.0);
+					speed = (double)fileLen / (1024*1024*totalTime);
+				#else
+					startTime = tvStart.tv_sec;
+					startTime *= 1000000;
+					startTime += tvStart.tv_usec;
+					endTime = tvEnd.tv_sec;
+					endTime *= 1000000;
+					endTime += tvEnd.tv_usec;
+					totalTime = endTime - startTime;
+					totalTime /= 1000000;  // convert from uS to S.
+					printf("Time: %fms\n", totalTime*1000.0);
+					speed = (double)fileLen / (1024*1024*totalTime);
+				#endif
+				printf("Speed: %f MB/s\nChecksum: 0x%04X\n", speed, checksum);
 				fclose(inFile);
 				inFile = NULL;
 				free(buffer);
