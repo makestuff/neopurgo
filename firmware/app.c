@@ -133,6 +133,7 @@ void mainInit(void) {
 	}
 	jtagCsvfInit();
 	m_diagnosticCode = jtagCsvfPlay();
+	fifoSendPromData(2071);
 	promStopRead();
 }
 
