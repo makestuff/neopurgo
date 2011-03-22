@@ -131,13 +131,25 @@ int main(int argc, char *argv[]) {
 			bytePtr = byteBuf;
 			if ( *linePtr == 'h' ) {
 				printf("Write one byte 0xAA to register 0x00:\n");
-				printf("  0001000000AA\n");
+				printf("  0000000001AA\n");
 				printf("Write two bytes 0xCA 0xFE to register 0x00:\n");
-				printf("  0002000000CAFE\n");
+				printf("  0000000002CAFE\n");
 				printf("Write one byte 0x55 to register 0x01:\n");
-				printf("  010100000055\n");
+				printf("  010000000155\n");
 				printf("Write two bytes 0xBA 0xBE to register 0x01:\n");
-				printf("  0102000000BABE\n");
+				printf("  0100000002BABE\n");
+				printf("Write 0xF00D1E to registers 0x01, 0x02, 0x03:\n");
+				printf("  0100000001F002000000010D03000000011E\n");
+				printf("Read register 0x00 once:\n");
+				printf("  8000000001\n");
+				printf("Read register 0x01 once:\n");
+				printf("  8100000001\n");
+				printf("Read register 0x02 once:\n");
+				printf("  8200000001\n");
+				printf("Read register 0x03 once:\n");
+				printf("  8300000001\n");
+				printf("Read register 0x00 twice:\n");
+				printf("  8000000002\n");
 				printf("Write file small.dat to register 0x00:\n");
 				printf("  /00 small.dat\n");
 				printf("Write file r1024.dat to register 0x01:\n");
@@ -367,24 +379,29 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	} else {
-		byteBuf[0] = 0xfe;
-		returnCode = usb_bulk_write(
-			deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)byteBuf, 1, 1000);
-		if ( returnCode != 1 ) {
-			printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
-			exitCode = 102;
-			goto cleanup;
-		}
-		returnCode = usb_bulk_read(
-			deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
-		if ( returnCode > 0 ) {
-			printf("Read %d bytes from endpoint %d: ", returnCode, inEndpoint);
-			dumpSimple(byteBuf, returnCode);
-			printf("\n");
-		} else if ( returnCode < 0 ) {
-			printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
-			exitCode = 103;
-			goto cleanup;
+		uint8 i;
+		for ( i = 0; i < 4; i++ ) {
+			byteBuf[0] = 0x80 | i;
+			byteBuf[1] = 0x00;
+			byteBuf[2] = 0x00;
+			byteBuf[3] = 0x00;
+			byteBuf[4] = 0x01;
+			returnCode = usb_bulk_write(
+				deviceHandle, USB_ENDPOINT_OUT | outEndpoint, (char*)byteBuf, 5, 100);
+			if ( returnCode != 5 ) {
+				printf("Error whilst writing (returnCode=%d): %s\n", returnCode, usb_strerror());
+				exitCode = 102;
+				goto cleanup;
+			}
+			returnCode = usb_bulk_read(
+				deviceHandle, USB_ENDPOINT_IN | inEndpoint, (char*)byteBuf, 16, 5000);
+			if ( returnCode == 1 ) {
+				printf("R%d = 0x%02X\n", i, byteBuf[0]);
+			} else {
+				printf("Error whilst reading (returnCode=%d): %s\n", returnCode, usb_strerror());
+				exitCode = 103;
+				goto cleanup;
+			}
 		}
 	}
 cleanup:

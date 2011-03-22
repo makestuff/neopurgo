@@ -131,7 +131,7 @@ void mainInit(void) {
 	}
 	jtagCsvfInit();
 	m_diagnosticCode = jtagCsvfPlay();
-	fifoSendPromData(5+2071);  // Five command bytes, 2071 data bytes
+	fifoSendPromData(23+2071);  // 23 command bytes, 2071 data bytes
 	promStopRead();
 }
 
