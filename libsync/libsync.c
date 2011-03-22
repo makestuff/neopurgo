@@ -41,19 +41,16 @@ SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle) {
 	// Put the device in sync mode
 	returnCode = usb_control_msg(
 		deviceHandle,
-		USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		CMD_SYNC_MODE,            // bRequest
 		0x0001,                   // wValue
 		0x0000,                   // wIndex
-		u.bytes,
-		4,                        // wLength
+		NULL,
+		0,                        // wLength
 		100                       // timeout (ms)
 	);
 	if ( returnCode < 0 ) {
 		sprintf(m_syncErrorMessage, "syncBulkEndpoints(): Unable to enable sync mode: %s", usb_strerror());
-		return SYNC_ENABLE;
-	} else if ( returnCode != 4 || u.lword != 0xCAFEBABE ) {
-		sprintf(m_syncErrorMessage, "syncBulkEndpoints(): Unable to enable sync mode!");
 		return SYNC_ENABLE;
 	}
 
@@ -121,19 +118,16 @@ SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle) {
 	// Bring the device out of sync mode
 	returnCode = usb_control_msg(
 		deviceHandle,
-		USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		CMD_SYNC_MODE,            // bRequest
 		0x0000,                   // wValue
 		0x0000,                   // wIndex
-		u.bytes,
-		4,                        // wLength
+		NULL,
+		0,                        // wLength
 		100                       // timeout (ms)
 	);
 	if ( returnCode < 0 ) {
 		sprintf(m_syncErrorMessage, "syncBulkEndpoints(): Unable to enable sync mode: %s", usb_strerror());
-		return SYNC_DISABLE;
-	} else if ( returnCode != 4 || u.lword != 0xCAFEBABE ) {
-		sprintf(m_syncErrorMessage, "syncBulkEndpoints(): Unable to enable sync mode!");
 		return SYNC_DISABLE;
 	}
 

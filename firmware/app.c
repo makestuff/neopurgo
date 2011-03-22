@@ -151,15 +151,12 @@ void mainLoop(void) {
 //
 uint8 handleVendorCommand(uint8 cmd) {
 	switch(cmd) {
+	// Put the device in sync mode, so its bulk endpoints can be sync'd with the host software
+	//
 	case CMD_SYNC_MODE:
-		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
 			// Enable sync mode if wValue is nonzero
 			syncSetEnabled(SETUP_VALUE() == 0 ? false : true);
-			while ( EP0CS & bmEPBUSY );
-			*((uint32 *)EP0BUF) = 0xCAFEBABE;
-			EP0BCH = 0;
-			SYNCDELAY;
-			EP0BCL = 4;
 		} else {
 			// Unrecognised operation
 			return false;
