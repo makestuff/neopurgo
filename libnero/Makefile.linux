@@ -18,13 +18,14 @@ TARGET = libnero.a
 
 INCLUDES = \
 	-I../../../include \
-	-I../../../libs/usbwrap
+	-I../../../libs/usbwrap \
+	-I../libsync
 
 CC_SRCS = $(shell ls *.c)
 CC_OBJS = $(CC_SRCS:%.c=$(OBJDIR)/%.o)
 CC = gcc
-CFLAGS = -g -Wall -Wextra -Wstrict-prototypes -Wundef -std=c99 -pedantic-errors -DFX2LOADER_PRIVATE $(INCLUDES)
-#CFLAGS = -O3 -Wall -Wextra -Wstrict-prototypes -Wundef -std=c99 -pedantic-errors -DFX2LOADER_PRIVATE $(INCLUDES)
+CFLAGS = -g -Wall -Wextra -Wstrict-prototypes -Wundef -std=c99 -pedantic-errors $(INCLUDES)
+#CFLAGS = -O3 -Wall -Wextra -Wstrict-prototypes -Wundef -std=c99 -pedantic-errors $(INCLUDES)
 OBJDIR = .build
 DEPDIR = .deps
 

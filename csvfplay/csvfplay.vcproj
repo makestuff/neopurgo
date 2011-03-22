@@ -62,7 +62,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/NODEFAULTLIB:LIBCMT"
-				AdditionalDependencies="../libnero/Debug/libnero.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
+				AdditionalDependencies="../libnero/Debug/libnero.lib ../libsync/Debug/libsync.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -137,7 +137,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/NODEFAULTLIB:LIBCMT"
-				AdditionalDependencies="../libnero/Release/libnero.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
+				AdditionalDependencies="../libnero/Release/libnero.lib ../libsync/Release/libsync.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="1"

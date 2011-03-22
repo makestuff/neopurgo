@@ -19,11 +19,6 @@
 
 #include <types.h>
 
-// NeroJTAG vendor commands
-#define CMD_NEROJTAG_CLOCK_DATA 0x80
-#define CMD_NEROJTAG_CLOCK_FSM  0x81
-#define CMD_NEROJTAG_CLOCK      0x82
-
 // Addressable bits on Port D for the four JTAG lines (named after the FPGA pins they connect to)
 // TDO is an input, the rest are outputs.
 sbit at 0xB0      TDO; /* Port D.0 */
@@ -52,6 +47,9 @@ sbit at 0xB4      TCK; /* Port D.4 */
 
 // Kick off a shift operation. Next time jtagExecuteShift() runs, it will execute the shift.
 void jtagShiftBegin(uint32 numBits, uint8 flagByte);
+
+// Return true if there's a shift operation pending
+bool jtagIsShiftPending(void);
 
 // Actually execute the shift operation initiated by jtagBeginShift(). This is done in a
 // separate method because vendor commands cannot read & write to bulk endpoints.

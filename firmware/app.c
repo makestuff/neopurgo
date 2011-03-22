@@ -21,15 +21,12 @@
 #include <types.h>
 #include "prom.h"
 #include "jtag.h"
+#include "sync.h"
 #include "defs.h"
+#include "../vendorCommands.h"
 
 // Function declarations
 void fifoSendPromData(uint32 bytesToSend);
-
-// The USB vendor commands
-#define CMD_CALCULATOR_TEST   0x90
-#define CMD_GET_DIAG_CODE     0x91
-#define CMD_READ_WRITE_EEPROM 0xA2
 
 xdata uint8 m_diagnosticCode = 0;
 
@@ -143,71 +140,28 @@ void mainInit(void) {
 //
 void mainLoop(void) {
 	// If there is a JTAG shift operation pending, execute it now.
-	jtagShiftExecute();
+	if ( jtagIsShiftPending() ) {
+		jtagShiftExecute();
+	} else if ( syncIsEnabled() ) {
+		syncExecute();
+	}
 }
 
 // Called when a vendor command is received
 //
 uint8 handleVendorCommand(uint8 cmd) {
 	switch(cmd) {
-	// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
-	//
-	case CMD_NEROJTAG_CLOCK_DATA:
-		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-			EP0BCL = 0x00;                                     // Allow host transfer in
-			while ( EP0CS & bmEPBUSY );                        // Wait for data
-			jtagShiftBegin(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
-			// Now that numBits & flagByte are set, this operation will continue in mainLoop()...
-		} else {
-			// Unrecognised operation
-			return false;
-		}
-		break;
-		
-	// Clock an (up to) 32-bit pattern LSB-first into TMS to change JTAG TAP states
-	//
-	case CMD_NEROJTAG_CLOCK_FSM:
-		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-			EP0BCL = 0x00;                                   // Allow host transfer in
-			while ( EP0CS & bmEPBUSY );                      // Wait for data
-			jtagClockFSM(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Bit pattern, transitionCount
-		} else {
-			// This command does not support OUT operations
-			return false;
-		}
-		break;
-		
-	// Execute a number of JTAG clocks.
-	//
-	case CMD_NEROJTAG_CLOCK:
-		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-			jtagClocks(*((uint32 *)(SETUPDAT+2)));
-		} else {
-			// This command does not support OUT operations
-			return false;
-		}
-		break;
-		
-	// Simple example command which does the four arithmetic operations on the data from
-	// the host, and sends the results back to the host
-	//
-	case CMD_CALCULATOR_TEST:
+	case CMD_SYNC_MODE:
 		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
-			xdata uint16 num1 = SETUP_VALUE();
-			xdata uint16 num2 = SETUP_INDEX();
-			uint16 *xdata outArray = (uint16 *)EP0BUF;
-
-			// It's an IN operation - prepare the response and send it
+			// Enable sync mode if wValue is nonzero
+			syncSetEnabled(SETUP_VALUE() == 0 ? false : true);
 			while ( EP0CS & bmEPBUSY );
-			outArray[0] = num1 + num2;
-			outArray[1] = num1 - num2;
-			outArray[2] = num1 * num2;
-			outArray[3] = num1 / num2;
+			*((uint32 *)EP0BUF) = 0xCAFEBABE;
 			EP0BCH = 0;
 			SYNCDELAY;
-			EP0BCL = 8;
+			EP0BCL = 4;
 		} else {
-			// This command does not support OUT operations
+			// Unrecognised operation
 			return false;
 		}
 		break;
@@ -230,6 +184,44 @@ uint8 handleVendorCommand(uint8 cmd) {
 		}
 		break;
 
+	// Clock data into and out of the JTAG chain. Reads from EP2OUT and writes to EP4IN.
+	//
+	case CMD_JTAG_CLOCK_DATA:
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+			EP0BCL = 0x00;                                     // Allow host transfer in
+			while ( EP0CS & bmEPBUSY );                        // Wait for data
+			jtagShiftBegin(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Init numBits & flagByte
+			// Now that numBits & flagByte are set, this operation will continue in mainLoop()...
+		} else {
+			// Unrecognised operation
+			return false;
+		}
+		break;
+		
+	// Clock an (up to) 32-bit pattern LSB-first into TMS to change JTAG TAP states
+	//
+	case CMD_JTAG_CLOCK_FSM:
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+			EP0BCL = 0x00;                                   // Allow host transfer in
+			while ( EP0CS & bmEPBUSY );                      // Wait for data
+			jtagClockFSM(*((uint32 *)EP0BUF), SETUPDAT[2]);  // Bit pattern, transitionCount
+		} else {
+			// This command does not support OUT operations
+			return false;
+		}
+		break;
+		
+	// Execute a number of JTAG clocks.
+	//
+	case CMD_JTAG_CLOCK:
+		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
+			jtagClocks(*((uint32 *)(SETUPDAT+2)));
+		} else {
+			// This command does not support OUT operations
+			return false;
+		}
+		break;
+		
 	// Command to talk to the EEPROM
 	//
 	case CMD_READ_WRITE_EEPROM:

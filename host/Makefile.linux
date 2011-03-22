@@ -17,13 +17,15 @@
 TARGET = host
 LIBS = \
 	../../../libs/argtypes/libargtypes.a \
-	../../../libs/usbwrap/libusbwrap.a \
 	../../../3rd/argtable2-12/src/.libs/libargtable2.a \
+	../libsync/libsync.a \
+	../../../libs/usbwrap/libusbwrap.a \
 	-lusb
 
 INCLUDES = \
 	-I../../../include \
 	-I../../../libs/argtypes \
+	-I../libsync \
 	-I../../../libs/usbwrap \
 	-I../../../3rd/argtable2-12/src
 

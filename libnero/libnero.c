@@ -17,6 +17,8 @@
 #include <usbwrap.h>
 #include <types.h>
 #include "libnero.h"
+#include "libsync.h"
+#include "../vendorCommands.h"
 
 static UsbDeviceHandle *m_deviceHandle = NULL;
 extern char m_neroErrorMessage[];
@@ -39,12 +41,6 @@ enum {
 	SEND_TYPE = 2
 };
 
-enum {
-	CMD_CLOCK_DATA = 0x80,
-	CMD_CLOCK_STATE_MACHINE,
-	CMD_CLOCK
-};
-
 static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, bool isResponseNeeded);
 static NeroStatus doSend(const uint8 *sendPtr, uint16 chunkSize);
 static NeroStatus doReceive(uint8 *receivePtr, uint16 chunkSize);
@@ -52,47 +48,17 @@ static NeroStatus doReceive(uint8 *receivePtr, uint16 chunkSize);
 // Find the NeroJTAG device, open it.
 //
 NeroStatus neroInitialise(uint16 vid, uint16 pid) {
-	const uint32 hackLower = 0x6861636B;
-	const uint32 hackUpper = 0x4841434B;
-	union {
-		uint32 lword;
-		char bytes[16];
-	} u;
+
 	int returnCode;
-	int count;
 
 	usbInitialise();
 	if ( usbOpenDevice(vid, pid, 1, 0, 0, &m_deviceHandle) ) {
 		sprintf(m_neroErrorMessage, "neroInitialise(): USB init failed: %s", usbStrError());
-		fail(NERO_USB_INIT);
+		return NERO_USB_INIT;
 	}
 
-	count = 0;
-	do {
-		u.lword = hackLower;
-		usb_bulk_write(m_deviceHandle, USB_ENDPOINT_OUT | 2, u.bytes, 4, 100);
-		returnCode = usb_bulk_read(m_deviceHandle, USB_ENDPOINT_IN | 4, u.bytes, 16, 100);
-		count++;
-	} while ( returnCode < 0 && count < 10 );
-	if ( count == 10 ) {
-		sprintf(
-			m_neroErrorMessage,
-			"neroInitialise(): Sync failed after %d attempts: %s",
-			count, usbStrError());
-		fail(NERO_SYNC);
-	}
-	if ( returnCode != 4 ) {
-		sprintf(
-			m_neroErrorMessage,
-			"neroInitialise(): Sync read back %d bytes instead of the expected 4",
-			returnCode);
-		fail(NERO_SYNC);
-	}
-	if ( u.lword != hackUpper ) {
-		sprintf(
-			m_neroErrorMessage,
-			"neroInitialise(): Sync read back 0x%08lX instead of the expected 0x%08lX",
-			u.lword, hackUpper);
+	if ( syncBulkEndpoints(m_deviceHandle) != SYNC_SUCCESS ) {
+		sprintf(m_neroErrorMessage, "neroInitialise(): %s", syncStrError());
 		fail(NERO_SYNC);
 	}
 
@@ -159,7 +125,7 @@ NeroStatus neroClockFSM(uint32 bitPattern, uint8 transitionCount) {
 	int returnCode = usb_control_msg(
 		m_deviceHandle,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		CMD_CLOCK_STATE_MACHINE,  // bRequest
+		CMD_JTAG_CLOCK_FSM,       // bRequest
 		(uint16)transitionCount,  // wValue
 		0x0000,                   // wIndex
 		(char*)&bitPattern,
@@ -179,7 +145,7 @@ NeroStatus neroClocks(uint32 numClocks) {
 	int returnCode = usb_control_msg(
 		m_deviceHandle,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		CMD_CLOCK,         // bRequest
+		CMD_JTAG_CLOCK,    // bRequest
 		numClocks&0xFFFF,  // wValue
 		numClocks>>16,     // wIndex
 		NULL,
@@ -212,12 +178,12 @@ static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, boo
 	returnCode = usb_control_msg(
 		m_deviceHandle,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		CMD_CLOCK_DATA,  // bRequest
-		wValue,          // wValue
-		0x0000,          // wIndex
-		(char*)&numBits, // send bit count
-		4,               // wLength
-		5000             // timeout (ms)
+		CMD_JTAG_CLOCK_DATA,  // bRequest
+		wValue,               // wValue
+		0x0000,               // wIndex
+		(char*)&numBits,      // send bit count
+		4,                    // wLength
+		5000                  // timeout (ms)
 	);
 	if ( returnCode < 0 ) {
 		sprintf(m_neroErrorMessage, "beginShift(): %s", usbStrError());

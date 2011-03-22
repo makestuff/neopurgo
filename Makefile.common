@@ -25,12 +25,13 @@ all: \
 	make -f Makefile.$(PLATFORM) -C ../../libs/argtypes
 	make -f Makefile.$(PLATFORM) -C ../../libs/usbwrap
 	make -f Makefile.$(PLATFORM) -C ../../libs/buffer
-	make -f Makefile.$(PLATFORM) -C host
-	make -f Makefile.$(PLATFORM) -C libnero
-	make -f Makefile.$(PLATFORM) -C csvfplay
-	make -f Makefile.$(PLATFORM) -C xsvf2csvf
-	make -f Makefile.$(PLATFORM) -C xilprg
 	make -C ../../3rd/fx2lib
+	make -f Makefile.$(PLATFORM) -C libsync
+	make -f Makefile.$(PLATFORM) -C libnero
+	make -f Makefile.$(PLATFORM) -C xsvf2csvf
+	make -f Makefile.$(PLATFORM) -C csvfplay
+	make -f Makefile.$(PLATFORM) -C xilprg
+	make -f Makefile.$(PLATFORM) -C host
 	make -C firmware
 	make -C vhdl
 
@@ -63,10 +64,12 @@ all: \
 	mv mulicheng-fx2lib* ../../3rd/fx2lib
 
 clean: FORCE
-	make -f Makefile.$(PLATFORM) -C host clean
+	make -f Makefile.$(PLATFORM) -C libsync clean
 	make -f Makefile.$(PLATFORM) -C libnero clean
-	make -f Makefile.$(PLATFORM) -C csvfplay clean
 	make -f Makefile.$(PLATFORM) -C xsvf2csvf clean
+	make -f Makefile.$(PLATFORM) -C csvfplay clean
+	make -f Makefile.$(PLATFORM) -C xilprg clean
+	make -f Makefile.$(PLATFORM) -C host clean
 	make -f Makefile.$(PLATFORM) -C xilprg clean
 	make -C firmware clean
 	make -C vhdl clean

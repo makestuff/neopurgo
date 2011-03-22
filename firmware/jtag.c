@@ -182,6 +182,10 @@ void jtagShiftBegin(uint32 numBits, uint8 flagByte) {
 	m_flagByte = flagByte;
 }
 
+bool jtagIsShiftPending(void) {
+	return (m_numBits != 0);
+}
+
 // The minimum number of bytes necessary to store x bits
 //
 #define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
@@ -191,211 +195,190 @@ void jtagShiftBegin(uint32 numBits, uint8 flagByte) {
 //
 void jtagShiftExecute(void) {
 	// Are there any JTAG send/receive operations to execute?
-	if ( m_numBits ) {
-		if ( (m_flagByte & bmSENDMASK) == bmSENDDATA ) {
-			if ( m_flagByte & bmNEEDRESPONSE ) {
-				// The host is giving us data, and is expecting a response (xdr)
-				xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				xdata uint8 *inPtr, *outPtr;
-				while ( m_numBits ) {
-					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-					bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
-					bytesRead = MAKEWORD(EP2BCH, EP2BCL);
-					if ( bytesRead != bitsToBytes(bitsRead) ) {
-						// Protocol violation - give up
-						m_numBits = 0UL;
-						break;
-					}
-
-					inPtr = EP2FIFOBUF;
-					outPtr = EP4FIFOBUF;
-					if ( bitsRead == m_numBits ) {
-						// This is the last chunk
-						xdata uint8 tdoByte, tdiByte, leftOver, i;
-						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
-						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
-						bytesRemaining = (bitsRemaining>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(*inPtr++);
-						}
-						tdiByte = *inPtr++;  // Now do the bits in the final byte
-						tdoByte = 0x00;
-						i = 1;
-						while ( i && leftOver ) {
-							leftOver--;
-							if ( (m_flagByte & bmISLAST) && !leftOver ) {
-								TMS = 1; // Exit Shift-DR state on next clock
-							}
-							TDI = tdiByte & 1;
-							tdiByte >>= 1;
-							if ( TDO ) {
-								tdoByte |= i;
-							}
-							TCK = 1;
-							TCK = 0;
-							i <<= 1;
-						}
-						*outPtr++ = tdoByte;
-					} else {
-						// This is not the last chunk
-						bytesRemaining = (bitsRead>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(*inPtr++);
-						}
-					}
-					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the copied data
-					SYNCDELAY; EP4BCL = LSB(bytesRead);
-					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-
-					m_numBits -= bitsRead;
+	if ( (m_flagByte & bmSENDMASK) == bmSENDDATA ) {
+		if ( m_flagByte & bmNEEDRESPONSE ) {
+			// The host is giving us data, and is expecting a response (xdr)
+			xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+			xdata uint8 *inPtr, *outPtr;
+			while ( m_numBits ) {
+				while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
+				while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
+				bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
+				bytesRead = MAKEWORD(EP2BCH, EP2BCL);
+				if ( bytesRead != bitsToBytes(bitsRead) ) {
+					// Protocol violation - give up
+					m_numBits = 0UL;
+					break;
 				}
-			} else {
-				// The host is giving us data, but does not need a response (xdn)
-				xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				xdata uint16 i;
-				while ( m_numBits ) {
-					while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
-					bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
-					bytesRead = MAKEWORD(EP2BCH, EP2BCL);
-					if ( bytesRead != bitsToBytes(bitsRead) ) {
-						// Protocol violation - give up
-						m_numBits = 0UL;
-						break;
-					}
 
-					inPtr = EP2FIFOBUF;
-					if ( bitsRead == m_numBits ) {
-						// This is the last chunk
-						xdata uint8 tdiByte, leftOver, i;
-						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
-						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
-						bytesRemaining = (bitsRemaining>>3);
-						while ( bytesRemaining-- ) {
-							shiftOut(*inPtr++);
-						}
-						tdiByte = *inPtr++;  // Now do the bits in the final byte
-						i = 1;
-						while ( i && leftOver ) {
-							leftOver--;
-							if ( (m_flagByte & bmISLAST) && !leftOver ) {
-								TMS = 1; // Exit Shift-DR state on next clock
-							}
-							TDI = tdiByte & 1;
-							tdiByte >>= 1;
-							TCK = 1;
-							TCK = 0;
-							i <<= 1;
-						}
-					} else {
-						// This is not the last chunk
-						bytesRemaining = (bitsRead>>3);
-						while ( bytesRemaining-- ) {
-							shiftOut(*inPtr++);
-						}
+				inPtr = EP2FIFOBUF;
+				outPtr = EP4FIFOBUF;
+				if ( bitsRead == m_numBits ) {
+					// This is the last chunk
+					xdata uint8 tdoByte, tdiByte, leftOver, i;
+					bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
+					leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
+					bytesRemaining = (bitsRemaining>>3);
+					while ( bytesRemaining-- ) {
+						*outPtr++ = shiftInOut(*inPtr++);
 					}
-
-					SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-					m_numBits -= bitsRead;
+					tdiByte = *inPtr++;  // Now do the bits in the final byte
+					tdoByte = 0x00;
+					i = 1;
+					while ( i && leftOver ) {
+						leftOver--;
+						if ( (m_flagByte & bmISLAST) && !leftOver ) {
+							TMS = 1; // Exit Shift-DR state on next clock
+						}
+						TDI = tdiByte & 1;
+						tdiByte >>= 1;
+						if ( TDO ) {
+							tdoByte |= i;
+						}
+						TCK = 1;
+						TCK = 0;
+						i <<= 1;
+					}
+					*outPtr++ = tdoByte;
+				} else {
+					// This is not the last chunk
+					bytesRemaining = (bitsRead>>3);
+					while ( bytesRemaining-- ) {
+						*outPtr++ = shiftInOut(*inPtr++);
+					}
 				}
+				SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the copied data
+				SYNCDELAY; EP4BCL = LSB(bytesRead);
+				SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
+
+				m_numBits -= bitsRead;
 			}
 		} else {
-			if ( m_flagByte & bmNEEDRESPONSE ) {
-				// The host is not giving us data, but is expecting a response (x0r)
-				xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-				xdata uint8 tdiByte;
-				if ( (m_flagByte & bmSENDMASK) == bmSENDZEROS ) {
-					tdiByte = 0x00;
-				} else {
-					tdiByte = 0xFF;
+			// The host is giving us data, but does not need a response (xdn)
+			xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+			xdata uint16 i;
+			while ( m_numBits ) {
+				while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
+				bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
+				bytesRead = MAKEWORD(EP2BCH, EP2BCL);
+				if ( bytesRead != bitsToBytes(bitsRead) ) {
+					// Protocol violation - give up
+					m_numBits = 0UL;
+					break;
 				}
-				while ( m_numBits ) {
-					while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
-					bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
-					bytesRead = bitsToBytes(bitsRead);
 
-					inPtr = EP2FIFOBUF;
-					outPtr = EP4FIFOBUF;
-					if ( bitsRead == m_numBits ) {
-						// This is the last chunk
-						xdata uint8 tdoByte, leftOver, i;
-						bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
-						leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
-						bytesRemaining = (bitsRemaining>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(tdiByte);
+				inPtr = EP2FIFOBUF;
+				if ( bitsRead == m_numBits ) {
+					// This is the last chunk
+					xdata uint8 tdiByte, leftOver, i;
+					bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
+					leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
+					bytesRemaining = (bitsRemaining>>3);
+					while ( bytesRemaining-- ) {
+						shiftOut(*inPtr++);
+					}
+					tdiByte = *inPtr++;  // Now do the bits in the final byte
+					i = 1;
+					while ( i && leftOver ) {
+						leftOver--;
+						if ( (m_flagByte & bmISLAST) && !leftOver ) {
+							TMS = 1; // Exit Shift-DR state on next clock
 						}
-						tdoByte = 0x00;
-						i = 1;
 						TDI = tdiByte & 1;
-						while ( i && leftOver ) {
-							leftOver--;
-							if ( (m_flagByte & bmISLAST) && !leftOver ) {
-								TMS = 1; // Exit Shift-DR state on next clock
-							}
-							if ( TDO ) {
-								tdoByte |= i;
-							}
-							TCK = 1;
-							TCK = 0;
-							i <<= 1;
-						}
-						*outPtr++ = tdoByte;
-					} else {
-						// This is not the last chunk
-						bytesRemaining = (bitsRead>>3);
-						while ( bytesRemaining-- ) {
-							*outPtr++ = shiftInOut(tdiByte);
-						}
+						tdiByte >>= 1;
+						TCK = 1;
+						TCK = 0;
+						i <<= 1;
 					}
-					SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the data
-					SYNCDELAY; EP4BCL = LSB(bytesRead);
-					m_numBits -= bitsRead;
-				}
-			} else {
-				// The host is not giving us data, and does not need a response (x0n)
-				xdata uint32 bitsRemaining, bytesRemaining;
-				xdata uint8 tdiByte, leftOver;
-				if ( (m_flagByte & bmSENDMASK) == bmSENDZEROS ) {
-					tdiByte = 0x00;
 				} else {
-					tdiByte = 0xFF;
-				}
-				bitsRemaining = (m_numBits-1) & 0xFFFFFFF8;    // Now an integer number of bytes
-				leftOver = (uint8)(m_numBits - bitsRemaining); // How many bits in last byte (1-8)
-				bytesRemaining = (bitsRemaining>>3);
-				while ( bytesRemaining-- ) {
-					shiftOut(tdiByte);
-				}
-				TDI = tdiByte & 1;
-				while ( leftOver ) {
-					leftOver--;
-					if ( (m_flagByte & bmISLAST) && !leftOver ) {
-						TMS = 1; // Exit Shift-DR state on next clock
+					// This is not the last chunk
+					bytesRemaining = (bitsRead>>3);
+					while ( bytesRemaining-- ) {
+						shiftOut(*inPtr++);
 					}
-					TCK = 1;
-					TCK = 0;
 				}
+
+				SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
+				m_numBits -= bitsRead;
 			}
 		}
-	}
-
-	if ( !(EP2468STAT & bmEP2EMPTY) ) {
-		// EP2 is not empty (host sent us a packet)
-		if  ( !(EP2468STAT & bmEP4FULL) ) {
-			// EP4 is not full (we can send host a packet)
-			xdata uint16 numBytes = MAKEWORD(EP2BCH, EP2BCL);
-			xdata uint16 i;
-			for ( i = 0; i < numBytes; i++ ) {
-				if ( EP2FIFOBUF[i] >= 'a' && EP2FIFOBUF[i] <= 'z' ) {
-					EP4FIFOBUF[i] = EP2FIFOBUF[i] & 0xDF;
-				} else {
-					EP4FIFOBUF[i] = EP2FIFOBUF[i];
-				}
+	} else {
+		if ( m_flagByte & bmNEEDRESPONSE ) {
+			// The host is not giving us data, but is expecting a response (x0r)
+			xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
+			xdata uint8 tdiByte;
+			if ( (m_flagByte & bmSENDMASK) == bmSENDZEROS ) {
+				tdiByte = 0x00;
+			} else {
+				tdiByte = 0xFF;
 			}
-			SYNCDELAY; EP4BCH = MSB(numBytes);  // Initiate send of the copied data
-			SYNCDELAY; EP4BCL = LSB(numBytes);
-			SYNCDELAY; OUTPKTEND = bmSKIP | 2;  // Acknowledge receipt of this packet
+			while ( m_numBits ) {
+				while ( EP2468STAT & bmEP4FULL );   // Wait for space for EP4IN data
+				bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
+				bytesRead = bitsToBytes(bitsRead);
+
+				inPtr = EP2FIFOBUF;
+				outPtr = EP4FIFOBUF;
+				if ( bitsRead == m_numBits ) {
+					// This is the last chunk
+					xdata uint8 tdoByte, leftOver, i;
+					bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
+					leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
+					bytesRemaining = (bitsRemaining>>3);
+					while ( bytesRemaining-- ) {
+						*outPtr++ = shiftInOut(tdiByte);
+					}
+					tdoByte = 0x00;
+					i = 1;
+					TDI = tdiByte & 1;
+					while ( i && leftOver ) {
+						leftOver--;
+						if ( (m_flagByte & bmISLAST) && !leftOver ) {
+							TMS = 1; // Exit Shift-DR state on next clock
+						}
+						if ( TDO ) {
+							tdoByte |= i;
+						}
+						TCK = 1;
+						TCK = 0;
+						i <<= 1;
+					}
+					*outPtr++ = tdoByte;
+				} else {
+					// This is not the last chunk
+					bytesRemaining = (bitsRead>>3);
+					while ( bytesRemaining-- ) {
+						*outPtr++ = shiftInOut(tdiByte);
+					}
+				}
+				SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the data
+				SYNCDELAY; EP4BCL = LSB(bytesRead);
+				m_numBits -= bitsRead;
+			}
+		} else {
+			// The host is not giving us data, and does not need a response (x0n)
+			xdata uint32 bitsRemaining, bytesRemaining;
+			xdata uint8 tdiByte, leftOver;
+			if ( (m_flagByte & bmSENDMASK) == bmSENDZEROS ) {
+				tdiByte = 0x00;
+			} else {
+				tdiByte = 0xFF;
+			}
+			bitsRemaining = (m_numBits-1) & 0xFFFFFFF8;    // Now an integer number of bytes
+			leftOver = (uint8)(m_numBits - bitsRemaining); // How many bits in last byte (1-8)
+			bytesRemaining = (bitsRemaining>>3);
+			while ( bytesRemaining-- ) {
+				shiftOut(tdiByte);
+			}
+			TDI = tdiByte & 1;
+			while ( leftOver ) {
+				leftOver--;
+				if ( (m_flagByte & bmISLAST) && !leftOver ) {
+					TMS = 1; // Exit Shift-DR state on next clock
+				}
+				TCK = 1;
+				TCK = 0;
+			}
 		}
 	}
 }

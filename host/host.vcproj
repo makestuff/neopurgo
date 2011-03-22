@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="../../../include;../../../libs/argtypes;../../../libs/usbwrap;../../../3rd/argtable2-12/src;../../../3rd/libusb-win32-bin-1.2.2.0/include"
+				AdditionalIncludeDirectories="../../../include;../../../libs/argtypes;../../../3rd/argtable2-12/src;../libsync;../../../libs/usbwrap;../../../3rd/libusb-win32-bin-1.2.2.0/include"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -62,7 +62,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/NODEFAULTLIB:LIBCMT"
-				AdditionalDependencies="../../../libs/argtypes/Debug/argtypes.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib ../../../3rd/argtable2-12/src/argtable2.lib"
+				AdditionalDependencies="../../../libs/argtypes/Debug/argtypes.lib ../../../3rd/argtable2-12/src/argtable2.lib ../libsync/Debug/libsync.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -117,7 +117,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="../../../include;../../../libs/argtypes;../../../libs/usbwrap;../../../3rd/argtable2-12/src;../../../3rd/libusb-win32-bin-1.2.2.0/include"
+				AdditionalIncludeDirectories="../../../include;../../../libs/argtypes;../../../3rd/argtable2-12/src;../libsync;../../../libs/usbwrap;../../../3rd/libusb-win32-bin-1.2.2.0/include"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -137,7 +137,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/NODEFAULTLIB:LIBCMT"
-				AdditionalDependencies="../../../libs/argtypes/Release/argtypes.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib ../../../3rd/argtable2-12/src/argtable2.lib"
+				AdditionalDependencies="../../../libs/argtypes/Release/argtypes.lib ../../../3rd/argtable2-12/src/argtable2.lib ../libsync/Release/libsync.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="1"

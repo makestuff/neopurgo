@@ -57,7 +57,7 @@ NeroStatus neroClockFSM(uint32 bitPattern, uint8 transitionCount);
 // Toggle TCK "numClocks" times.
 NeroStatus neroClocks(uint32 numClocks);
 
-// Get a message describing the last error.
+// Get the last error message, or junk if no error occurred.
 const char *neroStrError(void);
 
 #ifdef __cplusplus
