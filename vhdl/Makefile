@@ -1,11 +1,14 @@
 TOP_LEVEL = TopLevel
-PLATFORM = s3board
+PLATFORM = nexys2
 VHDLS = \
 	$(TOP_LEVEL).vhdl \
 	SevenSeg.vhdl
 
 ifeq ($(PLATFORM),s3board)
 	FPGA = xc3s200-ft256-4
+endif
+ifeq ($(PLATFORM),nexys2)
+	FPGA = xc3s1200e-fg320-4
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -31,7 +34,7 @@ $(TOP_LEVEL).xsvf: $(PLATFORM).batch $(TOP_LEVEL).bit
 	impact -batch temp.batch
 	rm -f temp.batch
 
-$(TOP_LEVEL).bit: $(TOP_LEVEL).ut $(TOP_LEVEL).ncd
+$(TOP_LEVEL).bit: $(PLATFORM).ut $(TOP_LEVEL).ncd
 	bitgen -intstyle ise -f $+
 
 $(TOP_LEVEL).twr: $(TOP_LEVEL).ncd $(PLATFORM).ucf
@@ -41,7 +44,7 @@ $(TOP_LEVEL).ncd: $(TOP_LEVEL)_map.ncd
 	par -w -intstyle ise -ol high -t 1 $< $@ ${TOP_LEVEL}.pcf
 
 $(TOP_LEVEL)_map.ncd: $(TOP_LEVEL).ngd
-	map -intstyle ise -p xc3s200-ft256-4 -cm area -ir off -pr off -c 100 -o $@ $< ${TOP_LEVEL}.pcf
+	map -intstyle ise -p $(FPGA) -cm area -ir off -pr off -c 100 -o $@ $< ${TOP_LEVEL}.pcf
 
 $(TOP_LEVEL).ngd: $(TOP_LEVEL).ngc $(PLATFORM).ucf
 	ngdbuild -intstyle ise -dd _ngo -nt timestamp -uc $(PLATFORM).ucf -p $(FPGA) $< $@
