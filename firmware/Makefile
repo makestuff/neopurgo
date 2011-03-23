@@ -32,13 +32,13 @@ CC = sdcc
 AS = asx8051
 CCFLAGS = -mmcs51 --code-size 0x3c00 --xram-size 0x0200 --xram-loc 0x3c00 -Wl"-b DSCR_AREA=0x3e00" -Wl"-b INT2JT=0x3f00"
 
-all: $(TARGET).iic
+all: $(TARGET).hex
 
 $(TARGET).hex: $(CC_OBJS) $(AS_OBJS) $(TARGET).rel
 	$(CC) $(CCFLAGS) -o $@ $(CC_OBJS) $(AS_OBJS) $(LIBS)
 
 %.rel: %.c
-	$(CC) $(CCFLAGS) -c --disable-warning 85 $(INCS) $?
+	$(CC) $(CCFLAGS) -c --disable-warning 85 $(INCS) -DNORENUM $?
 
 %.rel: %.a51
 	$(AS) -logs $?
@@ -46,9 +46,12 @@ $(TARGET).hex: $(CC_OBJS) $(AS_OBJS) $(TARGET).rel
 firmware.c: $(FX2LIBDIR)/fw/fw.c
 	cp $(FX2LIBDIR)/fw/fw.c firmware.c
 
-
 $(TARGET).iic: $(TARGET).hex
-	fx2loader $< $@
+	cat app.c | sed s/RENUMERATE_UNCOND/RENUMERATE_NOP/g > app_norenum.c
+	$(CC) $(CCFLAGS) -c --disable-warning 85 $(INCS) app_norenum.c
+	$(CC) $(CCFLAGS) -o $(TARGET)_norenum.hex $(CC_OBJS:app.rel=app_norenum.rel) $(AS_OBJS) $(LIBS)
+	rm -f app_norenum.c
+	fx2loader $(TARGET)_norenum.hex $@
 
 eeprom.iic: $(TARGET).iic ../vhdl/TopLevel.csvf command.dat random.dat
 	cat $+ > $@
@@ -58,6 +61,6 @@ eeprom: eeprom.iic
 
 
 clean: FORCE
-	rm -f *.iic *.asm *.hex *.lnk *.lst *.map *.mem *.rel *.rst *.sym firmware.c
+	rm -f *.iic *.asm *.hex *.lnk *.lst *.map *.mem *.rel *.rst *.sym firmware.c app_norenum.c
 
 FORCE:

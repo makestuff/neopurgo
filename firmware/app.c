@@ -31,12 +31,24 @@ void fifoSendPromData(uint32 bytesToSend);
 // General-purpose diagnostic code, for debugging. See CMD_GET_DIAG_CODE vendor command.
 xdata uint8 m_diagnosticCode = 0;
 
+// Defines for Digilent Nexys2
+#define bmN2FET bmBIT7
+sbit at 0xB7 N2FET; // Port D7
+
 // Called once at startup
 //
 void mainInit(void) {
 
 	xdata uint8 thisByte = 0xFF;
 	xdata uint16 blockSize;
+
+	// This is removed by the IIC Makefile rule (no renumeration needed for EEPROM-loaded firmware).
+	RENUMERATE_UNCOND();
+
+	// Return FIFO setings back to default just in case previous firmware messed with them.
+	SYNCDELAY; PINFLAGSAB = 0x00;
+	SYNCDELAY; PINFLAGSCD = 0x00;
+	SYNCDELAY; FIFOPINPOLAR = 0x00;
 
 	// Global settings
 	SYNCDELAY; REVCTL = (bmDYN_OUT | bmENH_PKT);
@@ -91,11 +103,15 @@ void mainInit(void) {
 	IOD = 0x00;
 
 	// Three JTAG bits drive pins on the FPGA
-	OED = bmTDI | bmTMS | bmTCK;
+	OED = bmTDI | bmTMS | bmTCK | bmN2FET;
+
+	// Drive the Nexys2 FET to power up the FPGA
+	N2FET = 1;
 
 	// If the FPGA is active, find the end of the FX2 code in the EEPROM and then send some of the
 	// following data to the FPGA
 	//if ( thisByte ) {
+/*
 	promStartRead(0x0000);
 	if ( promPeekByte() == 0xC2 ) {
 		promNextByte();    // VID(L)
@@ -129,10 +145,11 @@ void mainInit(void) {
 		promNextByte();    // Last byte
 		promNextByte();    // First byte after the end of the firmware
 	}
-	jtagCsvfInit();
-	m_diagnosticCode = jtagCsvfPlay();
-	fifoSendPromData(23+2071);  // 23 command bytes, 2071 data bytes
+	//jtagCsvfInit();
+	//m_diagnosticCode = jtagCsvfPlay();
+	//fifoSendPromData(23+2071);  // 23 command bytes, 2071 data bytes
 	promStopRead();
+*/
 }
 
 // Called repeatedly while the device is idle

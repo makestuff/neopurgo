@@ -50,5 +50,6 @@
 #define mainInit(x) main_init(x)
 #define mainLoop(x) main_loop(x)
 #define handleVendorCommand handle_vendorcommand
+#define RENUMERATE_NOP() { }
 
 #endif

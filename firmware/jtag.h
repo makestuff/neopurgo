@@ -21,10 +21,10 @@
 
 // Addressable bits on Port D for the four JTAG lines (named after the FPGA pins they connect to)
 // TDO is an input, the rest are outputs.
-sbit at 0xB0      TDO; /* Port D.0 */
-sbit at 0xB2      TDI; /* Port D.2 */
-sbit at 0xB3      TMS; /* Port D.3 */
-sbit at 0xB4      TCK; /* Port D.4 */
+sbit at 0xB0      TDO; // Port D0
+sbit at 0xB2      TDI; // Port D2
+sbit at 0xB3      TMS; // Port D3
+sbit at 0xB4      TCK; // Port D4
 
 // Equivalent bitmasks for OED and IOD.
 #define bmTDO     bmBIT0
