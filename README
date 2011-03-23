@@ -12,3 +12,51 @@ xilprg    - A fork of Zoltán Csizmadia's xilprg, with NeroJTAG capability
 libnero   - Host-side implementation of the NeroJTAG protocol
 vhdl      - Example FPGA design
 host      - Host-side tool for interacting with the example FPGA design
+
+
+Example NEXYS2 Session
+
+chris@wotan$ sudo fx2loader -v 0x1443 -p 0x0005 firmware/firmware.hex 
+
+chris@wotan$ time sudo ./xilprg/obj/linux/xilprg vhdl/TopLevel.bit 
+Xilinx Programmer 0.5 (Mar 23 2011 19:31:16)
+By Zoltan Csizmadia (xxxxxx_xxxxxxxxx@yyyyy.zzz)
+Selected cable is 'MakeStuff NeroJTAG'
+Opening 'MakeStuff NeroJTAG' ...
+Identifying chain contents ...
+'1' xc3s1200e Xilinx Spartan-3E
+'2' xcf04s Xilinx XCF00S Platform Flash
+2 device(s) found.
+'1' Programming xc3s1200e ...
+Successfully completed.
+real		 0m2.648s
+user		 0m0.040s
+sys			 0m0.028s
+
+chris@wotan$ sudo ./host/host 
+R0 = 0xA5
+R1 = 0x00
+R2 = 0x00
+R3 = 0x00
+
+chris@wotan$ sudo ./host/host -i
+> 0000000001AA
+Writing:  00 00 00 00 01 AA
+> 000000000110
+Writing:  00 00 00 00 01 10
+> 010000000101
+Writing:  01 00 00 00 01 01
+> 8000000001
+Writing:  80 00 00 00 01
+Read 1 bytes from endpoint 8:  A5
+> 8100000001
+Writing:  81 00 00 00 01
+Read 1 bytes from endpoint 8:  01
+> /00 firmware/random.dat
+Writing five command bytes followed by 2071 data bytes: 00 00 00 08 17 EB ... B8
+Time: 0.175000ms
+Speed: 11.286054 MB/s
+Checksum: 0x0C36
+> q
+
+chris@wotan$ 
