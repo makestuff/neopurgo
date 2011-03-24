@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 TARGET = host
+
 LIBS = \
 	../../../libs/argtypes/libargtypes.a \
 	../../../3rd/argtable2-12/src/.libs/libargtable2.a \
@@ -25,9 +26,9 @@ LIBS = \
 INCLUDES = \
 	-I../../../include \
 	-I../../../libs/argtypes \
+	-I../../../3rd/argtable2-12/src \
 	-I../libsync \
-	-I../../../libs/usbwrap \
-	-I../../../3rd/argtable2-12/src
+	-I../../../libs/usbwrap
 
 CC_SRCS = $(shell ls *.c)
 CC_OBJS = $(CC_SRCS:%.c=$(OBJDIR)/%.o)

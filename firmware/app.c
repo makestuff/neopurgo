@@ -42,7 +42,9 @@ void mainInit(void) {
 	xdata uint8 thisByte = 0xFF;
 	xdata uint16 blockSize;
 
-	// This is removed by the IIC Makefile rule (no renumeration needed for EEPROM-loaded firmware).
+	// This is only necessary for cases where you want to load firmware into the RAM of an FX2 that
+	// has already loaded firmware from an EEPROM. It should definitely be removed for firmwares
+	// which are themselves to be loaded from EEPROM.
 	RENUMERATE_UNCOND();
 
 	// Return FIFO setings back to default just in case previous firmware messed with them.

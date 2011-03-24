@@ -4,59 +4,129 @@ An FX2LP firmware and various host tools and libraries to make it easier to:
    * Reprogram the FPGA over USB
    * Communicate with the FPGA using HiSpeed USB (~25Mbyte/s)
 
+The project comprises these components:
 
-firmware  - FX2LP firmware, including FPGA bootload & NeroJTAG capability
-xsvf2csvf - Convert a Xilinx XSVF file into the compressed CSVF format
-csvfplay  - Play a CSVF file using a NeroJTAG-capable device
-xilprg    - A fork of Zoltán Csizmadia's xilprg, with NeroJTAG capability
-libnero   - Host-side implementation of the NeroJTAG protocol
-vhdl      - Example FPGA design
-host      - Host-side tool for interacting with the example FPGA design
+   xilprg    - A fork of Zoltán Csizmadia's xilprg, with NeroJTAG capability
+   host      - Host-side tool for interacting with the FPGA's registers
+   firmware  - FX2LP firmware, including FPGA bootload & NeroJTAG capability
+   vhdl      - Example FPGA design implementing four registers
+   xsvf2csvf - Convert a Xilinx XSVF file into the compressed CSVF format
+   csvfplay  - Play a CSVF file using a NeroJTAG-capable device
+   libnero   - Host-side implementation of the NeroJTAG protocol
+   libsync   - Host code to sync the FX2LP's bulk endpoints
 
+The project build assumes this directory ("neopurgo") lives within a structure like this:
 
-Example NEXYS2 Session
+src
+|
++-apps
+| |
+| +-neopurgo
+|
++-libs
+|
++-3rd
 
-chris@wotan$ sudo fx2loader -v 0x1443 -p 0x0005 firmware/firmware.hex 
+*** BUILDING ON WINDOWS ***
 
-chris@wotan$ time sudo ./xilprg/obj/linux/xilprg vhdl/TopLevel.bit 
-Xilinx Programmer 0.5 (Mar 23 2011 19:31:16)
-By Zoltan Csizmadia (xxxxxx_xxxxxxxxx@yyyyy.zzz)
-Selected cable is 'MakeStuff NeroJTAG'
-Opening 'MakeStuff NeroJTAG' ...
+make -f Makefile.win32 clean
+make -f Makefile.win32
+
+*** BUILDING ON LINUX ***
+
+make -f Makefile.linux clean
+make -f Makefile.linux
+
+----------------------------------------------------------------------------------------------------
+
+Example NEXYS2 Session (Linux)
+
+chris@wotan:~/src/apps/neopurgo$ sudo fx2loader -v 0x1443 -p 0x0005 firmware/firmware.hex
+chris@wotan:~/src/apps/neopurgo$ sudo ./xilprg/xilprg -c nero:04B4:8613 -s
+Identifying chain contents ...
+'1' xc3s1200e Xilinx Spartan-3E
+'2' xcf04s Xilinx XCF00S Platform Flash
+2 device(s) found.
+chris@wotan:~/src/apps/neopurgo$ sudo ./xilprg/xilprg -c nero:04B4:8613 -b vhdl/TopLevel.bit
 Identifying chain contents ...
 '1' xc3s1200e Xilinx Spartan-3E
 '2' xcf04s Xilinx XCF00S Platform Flash
 2 device(s) found.
 '1' Programming xc3s1200e ...
 Successfully completed.
-real		 0m2.648s
-user		 0m0.040s
-sys			 0m0.028s
+chris@wotan:~/src/apps/neopurgo$ sudo ./host/host 
+R0 = 0xA5                                        [this comes from the state of the board's switches]
+R1 = 0x00
+R2 = 0x00
+R3 = 0x00
+chris@wotan:~/src/apps/neopurgo$ sudo ./host/host -i
+> 0000000001aa                                   [this loads 0xAA into register 0]
+Writing:  00 00 00 00 01 AA
+> 000000000110                                   [this loads 0x10 into register 0]
+Writing:  00 00 00 00 01 10
+> 010000000101                                   [this loads 0x01 into register 1]
+Writing:  01 00 00 00 01 01
+> 8000000001                                     [read register 0]
+Writing:  80 00 00 00 01
+Read 1 bytes from endpoint 8:  A5
+> 8100000001                                     [read register 1]
+Writing:  81 00 00 00 01
+Read 1 bytes from endpoint 8:  01
+> /00 firmware/random.dat                        [upload firmware/random.dat into register 0]
+Writing five command bytes followed by 2071 data bytes: 00 00 00 08 17 EB ... B8
+Time: 0.217000ms
+Speed: 9.101657 MB/s
+Checksum: 0x0C36
+> q
+chris@wotan:~/src/apps/neopurgo$ 
 
-chris@wotan$ sudo ./host/host 
-R0 = 0xA5
+----------------------------------------------------------------------------------------------------
+
+Example NEXYS2 Session (Windows)
+
+Note: Ensure you have loaded LibUSB-Win32 drivers for both the default Nexys2 device (1443:0005) and
+      the Neopurgo firmware (04B4:8613).
+
+W:\src\apps\neopurgo>fx2loader -v 0x1443 -p 0x0005 firmware/firmware.hex
+
+W:\src\apps\neopurgo>.\xilprg\Release\xilprg.exe -c nero:04B4:8613 -s
+Identifying chain contents ...
+'1' xc3s1200e Xilinx Spartan-3E
+'2' xcf04s Xilinx XCF00S Platform Flash
+2 device(s) found.
+
+W:\src\apps\neopurgo>.\xilprg\Release\xilprg.exe -c nero:04B4:8613 -b vhdl/TopLevel.bit
+Identifying chain contents ...
+'1' xc3s1200e Xilinx Spartan-3E
+'2' xcf04s Xilinx XCF00S Platform Flash
+2 device(s) found.
+'1' Programming xc3s1200e ...
+Successfully completed.
+
+W:\src\apps\neopurgo>host\Release\host.exe
+R0 = 0xA5                                        [this comes from the state of the board's switches]
 R1 = 0x00
 R2 = 0x00
 R3 = 0x00
 
-chris@wotan$ sudo ./host/host -i
-> 0000000001AA
+W:\src\apps\neopurgo>host\Release\host.exe -i
+> 0000000001aa                                   [this loads 0xAA into register 0]
 Writing:  00 00 00 00 01 AA
-> 000000000110
+> 000000000110                                   [this loads 0x10 into register 0]
 Writing:  00 00 00 00 01 10
-> 010000000101
+> 010000000101                                   [this loads 0x01 into register 1]
 Writing:  01 00 00 00 01 01
-> 8000000001
+> 8000000001                                     [read register 0]
 Writing:  80 00 00 00 01
 Read 1 bytes from endpoint 8:  A5
-> 8100000001
+> 8100000001                                     [read register 1]
 Writing:  81 00 00 00 01
 Read 1 bytes from endpoint 8:  01
-> /00 firmware/random.dat
+> /00 firmware/random.dat                        [upload firmware/random.dat into register 0]
 Writing five command bytes followed by 2071 data bytes: 00 00 00 08 17 EB ... B8
-Time: 0.175000ms
-Speed: 11.286054 MB/s
+Time: 37.638024ms
+Speed: 0.052475 MB/s
 Checksum: 0x0C36
 > q
 
-chris@wotan$ 
+W:\src\apps\neopurgo>
