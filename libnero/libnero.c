@@ -21,9 +21,9 @@
 #include "../vendorCommands.h"
 
 static UsbDeviceHandle *m_deviceHandle = NULL;
+static uint16 m_endpointSize = 0x0000;
 extern char m_neroErrorMessage[];
 
-#define ENDPOINT_SIZE 512
 #define fail(x) returnCode = x; goto cleanup
 #define bitsToBytes(x) ((x>>3) + (x&7 ? 1 : 0))
 #define checkReturn() if ( status ) { return status; }
@@ -44,6 +44,7 @@ enum {
 static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, bool isResponseNeeded);
 static NeroStatus doSend(const uint8 *sendPtr, uint16 chunkSize);
 static NeroStatus doReceive(uint8 *receivePtr, uint16 chunkSize);
+static uint16 getEndpointSize(void);
 
 // Find the NeroJTAG device, open it.
 //
@@ -60,6 +61,11 @@ NeroStatus neroInitialise(uint16 vid, uint16 pid) {
 	if ( syncBulkEndpoints(m_deviceHandle) != SYNC_SUCCESS ) {
 		sprintf(m_neroErrorMessage, "neroInitialise(): %s", syncStrError());
 		fail(NERO_SYNC);
+	}
+
+	m_endpointSize = getEndpointSize();
+	if ( !m_endpointSize ) {
+		fail(NERO_ENDPOINTS);
 	}
 
 	return NERO_SUCCESS;
@@ -105,7 +111,7 @@ NeroStatus neroShift(uint32 numBits, const uint8 *inData, uint8 *outData, bool i
 	status = beginShift(numBits, sendType, isLast, isResponseNeeded); checkReturn();	
 	numBytes = bitsToBytes(numBits);
 	while ( numBytes ) {
-		chunkSize = (numBytes>=ENDPOINT_SIZE) ? ENDPOINT_SIZE : (uint16)numBytes;
+		chunkSize = (numBytes>=m_endpointSize) ? m_endpointSize : (uint16)numBytes;
 		if ( sendType == SEND_DATA ) {
 			status = doSend(inData, chunkSize); checkReturn();
 			inData += chunkSize;
@@ -220,4 +226,62 @@ static NeroStatus doReceive(uint8 *receivePtr, uint16 chunkSize) {
 		return NERO_RECEIVE;
 	}
 	return NERO_SUCCESS;
+}
+
+// Find the size of the EP2OUT & EP4IN bulk endpoints (they must be the same)
+//
+static uint16 getEndpointSize(void) {
+	char descriptorBuffer[1024];  // TODO: Fix by doing two queries
+	char *ptr = descriptorBuffer;
+	uint8 endpointNum;
+	uint16 ep2size = 0;
+	uint16 ep4size = 0;
+	struct usb_config_descriptor *configDesc;
+	struct usb_interface_descriptor *interfaceDesc;
+	struct usb_endpoint_descriptor *endpointDesc;
+	int returnCode = usb_control_msg(
+		m_deviceHandle,
+		USB_ENDPOINT_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
+		USB_REQ_GET_DESCRIPTOR,    // bRequest
+		0x0200,                    // wValue
+		0x0000,     // wIndex
+		descriptorBuffer,
+		1024,                 // wLength
+		5000               // timeout (ms)
+	);
+	if ( returnCode < 0 ) {
+		sprintf(m_neroErrorMessage, "getEndpointSize(): Failed to get config descriptor: %s", usb_strerror());
+		return 0x0000;
+	}
+	if ( returnCode > 0 ) {
+		configDesc = (struct usb_config_descriptor *)ptr;
+		ptr += configDesc->bLength;
+		interfaceDesc = (struct usb_interface_descriptor *)ptr;
+		ptr += interfaceDesc->bLength;			
+		endpointNum = interfaceDesc->bNumEndpoints;
+		while ( endpointNum-- ) {
+			endpointDesc = (struct usb_endpoint_descriptor *)ptr;
+			if ( endpointDesc-> bmAttributes == 0x02 ) {
+				if ( endpointDesc->bEndpointAddress == 0x02 ) {
+					ep2size = endpointDesc->wMaxPacketSize;
+				} else if ( endpointDesc->bEndpointAddress == 0x84 ) {
+					ep4size = endpointDesc->wMaxPacketSize;
+				}
+			}
+			ptr += endpointDesc->bLength;
+		}
+	}
+	if ( !ep2size ) {
+		sprintf(m_neroErrorMessage, "getEndpointSize(): EP2OUT not found or not configured as a bulk endpoint!");
+		return 0x0000;
+	}
+	if ( !ep4size ) {
+		sprintf(m_neroErrorMessage, "getEndpointSize(): EP4IN not found or not configured as a bulk endpoint!");
+		return 0x0000;
+	}
+	if ( ep2size != ep4size ) {
+		sprintf(m_neroErrorMessage, "getEndpointSize(): EP2OUT's wMaxPacketSize differs from that of EP4IN");
+		return 0x0000;
+	}
+	return ep2size;
 }
