@@ -29,10 +29,23 @@ src
 
 *** BUILDING ON WINDOWS ***
 
+Prerequisites:
+   * Visual Studio Express 2008
+   * SDCC 2.9.0
+   * Xilinx ISE WebPACK
+   * Fx2tools
+
 make -f Makefile.win32 clean
 make -f Makefile.win32
 
 *** BUILDING ON LINUX ***
+
+Prerequisites:
+   * sudo apt-get install g++
+   * sudo apt-get install libusb-dev
+   * sudo apt-get install sdcc
+   * Xilinx ISE WebPACK
+   * Fx2tools
 
 make -f Makefile.linux clean
 make -f Makefile.linux
