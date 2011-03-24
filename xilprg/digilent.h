@@ -78,7 +78,7 @@ public:
 	enum
 	{
 		BULK_PACKET_DATA_LEN  = 61,
-		MAX_BULK_PACKET_BURST = 16,
+		MAX_BULK_PACKET_BURST = 16
 	};
 
 #pragma pack(1)

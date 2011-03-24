@@ -95,9 +95,4 @@ typedef unsigned long long      u64;
 #define vsnprintf				_vsnprintf
 #endif
 
-#if defined(__GNUC__)
-#define stricmp					strcasecmp
-#define strnicmp				strncasecmp
-#endif
-
 #endif

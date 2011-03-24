@@ -392,8 +392,11 @@ int mcs_file::save(const char* file, void* data, int len)
 	FILE* f;
 	int rc = -1;
     int addr, addr_offs, count;
-    u8 buff[16];
-    int buff_len = 16;
+	const int buff_len = 16;
+	union {
+		u8 buff[buff_len];
+		u16 word;
+	} u;
 
 	f = fopen(file, "wt");
 	if (f == NULL)
@@ -405,8 +408,8 @@ int mcs_file::save(const char* file, void* data, int len)
     addr = 0;
     addr_offs = 0;
     
-    *(u16*)buff = 0;
-    if (write_record(f, 2, 0, RECORD_ADDRESS, buff))
+    u.word = 0x0000;
+    if (write_record(f, 2, 0, RECORD_ADDRESS, u.buff))
         goto cleanup;
     
     while (addr_offs + addr < len)
@@ -425,8 +428,8 @@ int mcs_file::save(const char* file, void* data, int len)
         {
             addr_offs += 0x10000;
             addr &= 0xFFFF;
-            *(u16*)buff = HTON16(addr_offs >> 16);
-            if (write_record(f, 2, 0, RECORD_ADDRESS, buff))
+            u.word = HTON16(addr_offs >> 16);
+            if (write_record(f, 2, 0, RECORD_ADDRESS, u.buff))
                 goto cleanup;
         }
     }

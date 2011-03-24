@@ -397,7 +397,7 @@ int cmd_cable(int argc, const char** argv)
         return 0;
 
     cbl->get_description(desc);
-    msgf(STR_SELECTED_CABLE, desc.c_str());
+    //msgf(STR_SELECTED_CABLE, desc.c_str());
 
     return 0;
 }
@@ -486,12 +486,6 @@ int process_command_line(const char* line)
 
     if (line == NULL)
         return 0;
-
-    if (line[0] == '.')
-    {
-        system(line + 1);
-        return 0;
-    }
 
 	current_command_line = line;
 

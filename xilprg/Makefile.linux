@@ -1,110 +1,81 @@
-PROJ = xilprg
-
-########################################
+# xilprg is covered by the LGPL:
 # 
-VER_MJ := $(shell gawk '/VERSION_MAJOR/ {print $$3}' src/xilprg.h)
-VER_MN := $(shell gawk '/VERSION_MINOR/ {print $$3}' src/xilprg.h)
-
-########################################
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2 of the License, or (at your option) any later version.
 # 
-IS_CYGWIN=$(shell uname | grep -i cygwin > /dev/null 2>&1 && echo yes || echo no)
-
-########################################
-# Directories
-
-SRC_DIR = src
-ifeq ($(IS_CYGWIN),yes)
-OBJ_DIR = obj/cygwin
-else
-OBJ_DIR = obj/linux
-endif 
-
-ifeq ($(IS_CYGWIN),yes)
-BIN_EXT = .exe
-else
-BIN_EXT =
-endif
-
-XILPRG_DIR = xilprg-$(VER_MJ).$(VER_MN)
-
-########################################
-# Compiler options
-
-SRCS = \
-	$(SRC_DIR)/xilprg.cpp \
-	$(SRC_DIR)/cmdline.cpp \
-	$(SRC_DIR)/cmds.cpp \
-	$(SRC_DIR)/utils.cpp \
-	$(SRC_DIR)/vartable.cpp \
-	$(SRC_DIR)/strtable.cpp \
-	$(SRC_DIR)/prgfile.cpp \
-	$(SRC_DIR)/chip.cpp \
-	$(SRC_DIR)/parport.cpp \
-	$(SRC_DIR)/nero.cpp \
-	$(SRC_DIR)/cable.cpp \
-	$(SRC_DIR)/digilent.cpp \
-	$(SRC_DIR)/xilinx.cpp
-
-OBJS = $(addsuffix .o, \
-		$(addprefix $(OBJ_DIR)/, \
-		$(basename $(notdir $(SRCS)))))
-TARG = $(OBJ_DIR)/$(PROJ)$(BIN_EXT)
-CONF = $(OBJ_DIR)/$(PROJ).conf
-
-CC    = g++
-LD    = g++
-
-#CPFLAGS = -g -Wall
-CPFLAGS = -O3 -Wall -I../../../include -I../libnero
-
-LDFLAGS =
-
-ifeq ($(IS_CYGWIN),yes)
-LIBS = -lioperm -lreadline
-else
-LIBS = -lusb -lreadline -lncurses ../libnero/libnero.a ../libsync/libsync.a ../../../libs/usbwrap/libusbwrap.a
-endif
-
-########################################
-# Rules
-
-all: mkdirs $(TARG) $(CONF)
-
-clean:
-	-rm -rf $(OBJ_DIR)
-
-$(TARG) : $(OBJS)
-	$(LD) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
-
-$(CONF) : $(PROJ).conf
-	cp -f $< $@
-
-mkdirs:
-	-mkdir -p $(OBJ_DIR)
-
-srctar:
-	tar -cjvf $(XILPRG_DIR)-src.tar.bz2 -C .. \
-		$(XILPRG_DIR)/src \
-		$(XILPRG_DIR)/makefile \
-		$(XILPRG_DIR)/xilprg.dsp \
-		$(XILPRG_DIR)/xilprg.dsw \
-		$(XILPRG_DIR)/xilprg.conf \
-		$(XILPRG_DIR)/readme.txt \
-		$(XILPRG_DIR)/license.txt
-
-winbintar:
-	tar -cjvf $(XILPRG_DIR)-win32.tar.bz2 \
-		xilprg.conf readme.txt license.txt \
-		-C obj/win32/Release xilprg.exe
-
-linuxbintar:
-	tar -cjvf $(XILPRG_DIR)-linux.tar.bz2 \
-		xilprg.conf readme.txt license.txt \
-		-C obj/linux xilprg
-
-tar: srctar winbintar linuxbintar
-
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the
+# Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+# Boston, MA 02111-1307, USA.
+# 
+# Copyright (c) 2006 Zoltan Csizmadia <zoltan_csizmadia@yahoo.com>
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. The name of the author may not be used to endorse or promote products
+#    derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+# NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+# THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+TARGET = xilprg
 
-$(OBJ_DIR)/%.o : $(SRC_DIR)/%.cpp
-	$(CC) -c $(CPFLAGS) $< -o $@
+LIBS = \
+	../../../libs/argtypes/libargtypes.a \
+	../../../3rd/argtable2-12/src/.libs/libargtable2.a \
+	../libnero/libnero.a \
+	../libsync/libsync.a \
+	../../../libs/usbwrap/libusbwrap.a \
+	-lusb
+
+INCLUDES = \
+	-I../../../include \
+	-I../../../libs/argtypes \
+	-I../../../3rd/argtable2-12/src \
+	-I../libnero
+
+CPP_SRCS = $(shell ls *.cpp)
+CPP_OBJS = $(CPP_SRCS:%.cpp=$(OBJDIR)/%.o)
+CPP = g++
+CPPFLAGS = -O3 -Wall -Wextra -Wundef -std=c++98 -Wno-long-long -pedantic-errors $(INCLUDES)
+LDFLAGS = -Wl,--relax -Wl,--gc-sections
+OBJDIR = .build
+DEPDIR = .deps
+
+all: $(TARGET)
+
+$(TARGET): $(CPP_OBJS)
+	$(CPP) $(LDFLAGS) -Wl,-Map=$(OBJDIR)/$(TARGET).map,--cref -o $(TARGET) $(CPP_OBJS) $(LIBS)
+	strip $(TARGET)
+
+$(OBJDIR)/%.o : %.cpp
+	$(CPP) -c $(CPPFLAGS) -MMD -MP -MF $(DEPDIR)/$(@F).d -Wa,-adhlns=$(OBJDIR)/$<.lst $< -o $@
+
+clean: FORCE
+	rm -rf $(OBJDIR) $(TARGET) $(DEPDIR) Debug Release *.ncb *.suo *.sln *.user
+
+-include $(shell mkdir -p $(OBJDIR) $(DEPDIR) 2>/dev/null) $(wildcard $(DEPDIR)/*)
+
+FORCE:

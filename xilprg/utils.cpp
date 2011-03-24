@@ -47,11 +47,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cmdline.h"
 #include "prgfile.h"
 
-#if (!defined(WIN32) || defined(__CYGWIN__))
-#include <readline/readline.h>
-#include <readline/history.h>
-#endif
-
 static u8 reverse_bits_table[256] = 
 {
     0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0,
@@ -155,42 +150,6 @@ int get_current_directory(char* sz, int len)
     return  GetCurrentDirectory(len, sz) ? 0 : -1;
 #else
     return getcwd(sz, len) ? 0 : -1;
-#endif
-}
-
-int prompt_read_line(const char* prompt, char* line, int maxlen)
-{
-#if defined(WIN32) && !defined(__CYGWIN__)
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-
-    // Change text color
-	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	SetConsoleTextAttribute(
-        GetStdHandle(STD_OUTPUT_HANDLE), 
-        FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-
-    printf(prompt);
-
-    // Restore text color
-    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), csbi.wAttributes);
-	
-    if (fgets(line, maxlen, stdin) == NULL)
-        return -1;
-
-    strip_whitespaces(line);
-	return 0;
-#else
-	char* sz;
-	
-	sz = readline(prompt);
-	if (sz == NULL)
-		return -1;
-    if (*sz)
-		add_history(sz);
-    strip_whitespaces(sz);
-    strncpy(line, sz, maxlen);
-	free(sz);
-	return 0;
 #endif
 }
 

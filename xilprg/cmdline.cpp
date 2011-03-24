@@ -229,7 +229,7 @@ int cmdline_has_opt(int argc, const char** argv, const char* opt)
 #else
 		if (argv[i][0] == '-')
 #endif
-            if (stricmp(argv[i] + 1, opt) == 0)
+            if (strcasecmp(argv[i] + 1, opt) == 0)
                 return i;
     return 0;
 }

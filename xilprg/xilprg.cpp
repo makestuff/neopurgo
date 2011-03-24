@@ -45,6 +45,9 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef WIN32
 	#include <windows.h>
 #endif
+#include <argtable2.h>
+#include <arg_uint.h>
+#include <types.h>
 #include "xilprg.h"
 #include "utils.h"
 #include "cmds.h"
@@ -139,7 +142,7 @@ cable* open_cable(int detect)
         return NULL;
 
     cbl->get_description(desc);
-    msgf(STR_OPENING, desc.c_str());
+    //msgf(STR_OPENING, desc.c_str());
 
     if (cbl->open())
     {
@@ -209,7 +212,7 @@ int load_config_file(const char *config)
         if (line[0] == ';' || line[0] == '#')
             continue;
 
-        if (stricmp(line, "BEGIN_FAMILY") == 0)
+        if (strcasecmp(line, "BEGIN_FAMILY") == 0)
         {
             if (family != NULL)
                 goto cleanup;
@@ -218,7 +221,7 @@ int load_config_file(const char *config)
                 goto cleanup;
         }
         else
-        if (stricmp(line, "END_FAMILY") == 0)
+        if (strcasecmp(line, "END_FAMILY") == 0)
         {
             if (family == NULL)
                 goto cleanup;
@@ -252,7 +255,7 @@ int load_config_file(const char *config)
     
             if (family)
             {
-                if (stricmp(name, "CHIP") == 0)
+                if (strcasecmp(name, "CHIP") == 0)
                 {
                     if (argc != 4)
                         goto cleanup;
@@ -295,57 +298,89 @@ cleanup:
 	return rc;
 }
 
-int main(int argc, const char *argv[])
-{
+#define fail(x) exitCode = x; goto cleanup
+
+int main(int argc, char *argv[]) {
+	struct arg_str *cblOpt   = arg_str1("c", "cable", "nero:<VID>:<PID> | xil3 | dusb", "cable driver to use");
+	struct arg_lit  *scanOpt = arg_lit0("s", "scan", "       scan the JTAG chain");
+	struct arg_file *bitOpt  = arg_file0("b", "bitfile", "<fileName>", " bit file to load");
+	struct arg_uint *devOpt  = arg_uint0("d", "device", "<device>", "  target device (default \"1\")");
+	struct arg_lit *helpOpt  = arg_lit0("h", "help", "            print this help and exit\n");
+	struct arg_end  *endOpt  = arg_end(20);
+	void* argTable[] = {cblOpt, scanOpt, bitOpt, devOpt, helpOpt, endOpt};
+	const char *progName = "xilprg";
+	uint32 exitCode = 0;
+	int numErrors;
+	const char *cable, *bitFile;
+	uint32 devNum;
 	char line[1024];
 	char configFileName[4097];  // TODO: Fix, somehow.
-	int rc = -1;
 
-	if ( argc != 2 ) {
-		fprintf(stderr, "Synopsis: xilprg <bitFile>\n");
-		exit(1);
+	if ( arg_nullcheck(argTable) != 0 ) {
+		fprintf(stderr, "%s: insufficient memory\n", progName);
+		fail(1);
 	}
 
-	process_command_line("version");
-	printf("\n");
+	numErrors = arg_parse(argc, argv, argTable);
+
+	if ( helpOpt->count > 0 ) {
+		printf("Xilinx Programmer 0.6 Copyright (C) 2006-2011 Zoltan Csizmadia & Chris McClelland\n\nUsage: %s", progName);
+		arg_print_syntax(stdout, argTable, "\n");
+		printf("\nProgram a Xilinx FPGA.\n\n");
+		arg_print_glossary(stdout, argTable,"  %-10s %s\n");
+		fail(0);
+	}
+
+	if ( numErrors > 0 ) {
+		arg_print_errors(stdout, endOpt, progName);
+		fprintf(stderr, "Try '%s --help' for more information.\n", progName);
+		fail(2);
+	}
+
+	if ( (scanOpt->count == 0 && bitOpt->count == 0) ||
+	     (scanOpt->count != 0 && bitOpt->count != 0) )
+	{
+		fprintf(stderr, "%s: you must specify either -s|--scan or -b|--bitfile, but not both\n", progName);
+		fprintf(stderr, "Try '%s --help' for more information.\n", progName);
+		fail(3);
+	}
+
+	cable = cblOpt->sval[0];
+	bitFile = bitOpt->count ? bitOpt->filename[0] : NULL;
+	devNum = devOpt->count ? devOpt->ival[0] : 1;
 
 	if ( initialize() ) {
-		rc = -1;
-		goto cleanup;
+		fprintf(stderr, "%s failed to initialize!\n", progName);
+		fail(4);
 	}
 
-	rc = getConfigFullPath("xilprg.conf", configFileName, sizeof(configFileName));
-	if ( rc ) {
-		rc = -2;
-		goto cleanup;
+	if ( getConfigFullPath("xilprg.conf", configFileName, sizeof(configFileName)) ) {
+		fprintf(stderr, "%s failed to determine the location of its config file!\n", progName);
+		fail(5);
 	}
 
 	if ( load_config_file(configFileName) ) {
-		rc = -3;
-		goto cleanup;
+		fprintf(stderr, "%s failed to load its config file from %s!\n", progName, configFileName);
+		fail(6);
 	}
 
 	try {
-		process_command_line("cable nero");
-		strcpy(line, "program 1 ");
-		strcpy(line+10, argv[1]);
+		sprintf(line, "cable %s", cable);
 		process_command_line(line);
+		if ( scanOpt->count ) {
+			process_command_line("detect");
+		} else {
+			sprintf(line, "program %lu %s", devNum, bitFile);
+			process_command_line(line);
+		}
 	}
 	catch ( const std::exception &ex ) {
-		fprintf(stderr, "%s\n", ex.what());
-		rc = -4;
+		fprintf(stderr, "%s failed: %s!\n", progName, ex.what());
+		fail(7);
 	}
-	//do {
-	//	if (prompt_read_line("xilprg> ", line, sizeof(line)) < 0)
-	//		break;
-	//} while (process_command_line(line) != CMDLINE_EXIT_PROGRAM);
-
-	rc = 0;
 
 cleanup:
-	if ( rc ) {
-		fprintf(stderr, "Failed returnCode %d\n", rc);
-	}
 	uninitialize();   
-	return rc;
+	arg_freetable(argTable, sizeof(argTable)/sizeof(argTable[0]));
+	return exitCode;
 }

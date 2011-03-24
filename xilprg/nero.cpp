@@ -59,17 +59,34 @@ public:
 	}
 };
 
-nero::nero() { }
+nero::nero(const char *initStr) {
+	const char *ptr = initStr;
+	char *endPtr;
+	while ( *ptr && *ptr != ':' ) {
+		ptr++;
+	}
+	if ( *ptr == '\0' ) {
+		throw nero_exception("Try nero:VID:PID");
+	}
+	ptr++;
+	m_vid = (u16)strtoul(ptr, &endPtr, 16);
+	if ( endPtr == ptr ) {
+		throw nero_exception("Try nero:VID:PID");
+	}
+	ptr = endPtr + 1;
+	m_pid = (u16)strtoul(ptr, &endPtr, 16);
+	if ( endPtr == ptr ) {
+		throw nero_exception("Try nero:VID:PID");
+	}
+}
 
 nero::~nero() { }
 
 // Find the NeroJTAG device, open it.
 //
 int nero::open() {
-	NeroStatus status = neroInitialise(0x04B4, 0x8613);
-	if ( status != NERO_SUCCESS ) {
-		printf("%s\n", neroStrError());
-		return -1;
+	if ( neroInitialise(m_vid, m_pid) != NERO_SUCCESS ) {
+		throw nero_exception(neroStrError());
 	}
 	return 0;
 }
@@ -86,19 +103,27 @@ int nero::close() {
 //   Out pointer may be NULL (not interested in data shifted out of the chain).
 //
 void nero::shift(int numBits, void *const ptdi, void *const ptdo, int isLast) {
-	neroShift(numBits, (const u8 *)ptdi, (u8 *)ptdo, isLast==0 ? false : true);
+	if ( neroShift(numBits, (const u8 *)ptdi, (u8 *)ptdo, isLast==0 ? false : true)
+	     != NERO_SUCCESS )
+	{
+		throw nero_exception(neroStrError());
+	}
 }
 
 // Apply the supplied bit pattern to TMS, to move the TAP to a specific state.
 //
 void nero::tms_transition(u32 data, int numBits) {
-	neroClockFSM(data, (uint8)numBits);
+	if ( neroClockFSM(data, (uint8)numBits) != NERO_SUCCESS ) {
+		throw nero_exception(neroStrError());
+	}
 }
 
 // Cycle the TCK line for the given number of times.
 //
 void nero::tck_cycle(int numCycles) {
-	neroClocks(numCycles);
+	if ( neroClocks(numCycles) != NERO_SUCCESS ) {
+		throw nero_exception(neroStrError());
+	}
 }
 
 // Get the cable description

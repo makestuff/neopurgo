@@ -572,7 +572,7 @@ cable* cable::factory(const char* s)
     if (argc == 0)
         return NULL;
 
-    if (stricmp(argv[0], "xil3") == 0)
+    if (strcasecmp(argv[0], "xil3") == 0)
     {
         if (argc == 1)
             addr = 0x378;
@@ -585,10 +585,10 @@ cable* cable::factory(const char* s)
         cbl = new parport((unsigned int)addr);
     }
     else
-    if (stricmp(argv[0], "dusb") == 0)
+    if (strcasecmp(argv[0], "dusb") == 0)
         cbl = new digilent;
-    else if (stricmp(argv[0], "nero") == 0)
-        cbl = new nero;
+    else if (strncasecmp(argv[0], "nero", 4) == 0)
+        cbl = new nero(argv[0]);
     else
     {
         msgf(STR_INVALID_CABLE_DEF);

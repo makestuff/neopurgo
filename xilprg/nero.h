@@ -49,8 +49,12 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "usb.h"
 
 class nero : public cable {
+
+	u16 m_vid;
+	u16 m_pid;
+
 public:
-	nero();
+	explicit nero(const char *);
 	virtual ~nero();
 
 	virtual int open();

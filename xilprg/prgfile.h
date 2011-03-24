@@ -110,7 +110,7 @@ public:
 	{
 		RECORD_DATA		= 0,
 		RECORD_EOF      = 1,
-		RECORD_ADDRESS  = 4,
+		RECORD_ADDRESS  = 4
 	};
 
 public:

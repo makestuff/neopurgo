@@ -3,8 +3,10 @@
 	ProjectType="Visual C++"
 	Version="9.00"
 	Name="xilprg"
-	ProjectGUID="{60E54202-C0E5-4F69-92BE-4AC918E0C922}"
-	TargetFrameworkVersion="0"
+	ProjectGUID="{0C8497EF-17CC-4685-882D-4EB0244CC13A}"
+	RootNamespace="xilprg"
+	Keyword="Win32Proj"
+	TargetFrameworkVersion="196613"
 	>
 	<Platforms>
 		<Platform
@@ -15,14 +17,11 @@
 	</ToolFiles>
 	<Configurations>
 		<Configuration
-			Name="Release|Win32"
-			OutputDirectory=".\obj\win32\Release"
-			IntermediateDirectory=".\obj\win32\Release"
+			Name="Debug|Win32"
+			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC60.vsprops"
-			UseOfMFC="0"
-			ATLMinimizesCRunTimeLibraryUsage="false"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -38,46 +37,35 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
-				TypeLibraryName=".\obj\win32\Release/xilprg.tlb"
-				HeaderFileName=""
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories=".\src,../../../include,../libnero,../../../libs/usbwrap,../../../3rd/libusb-win32-bin-1.2.2.0/include"
-				PreprocessorDefinitions="NDEBUG;WIN32;_CONSOLE;NATIVE_WIN32;_CRT_SECURE_NO_WARNINGS"
-				StringPooling="true"
-				RuntimeLibrary="2"
-				EnableFunctionLevelLinking="true"
-				PrecompiledHeaderFile=".\obj\win32\Release/xilprg.pch"
-				AssemblerListingLocation=".\obj\win32\Release/"
-				ObjectFile=".\obj\win32\Release/"
-				ProgramDataBaseFileName=".\obj\win32\Release/"
-				WarningLevel="4"
-				SuppressStartupBanner="true"
+				Optimization="0"
+				AdditionalIncludeDirectories="../../../include;../../../libs/argtypes;../../../3rd/argtable2-12/src;../libnero;../../../3rd/libusb-win32-bin-1.2.2.0/include"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;NATIVE_WIN32;_CRT_SECURE_NO_WARNINGS;strncasecmp=_strnicmp;strcasecmp=_stricmp"
+				MinimalRebuild="true"
+				BasicRuntimeChecks="3"
+				RuntimeLibrary="3"
+				UsePrecompiledHeader="0"
+				WarningLevel="3"
+				DebugInformationFormat="4"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="NDEBUG"
-				Culture="1033"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="../libnero/Release/libnero.lib ../libsync/Release/libsync.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
-				OutputFile=".\obj\win32\Release/xilprg.exe"
-				LinkIncremental="1"
-				SuppressStartupBanner="true"
-				ProgramDatabaseFile=".\obj\win32\Release/xilprg.pdb"
+				AdditionalOptions="/NODEFAULTLIB:LIBCMT"
+				AdditionalDependencies="../../../libs/argtypes/Debug/argtypes.lib ../../../3rd/argtable2-12/src/argtable2.lib ../libnero/Debug/libnero.lib ../libsync/Debug/libsync.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
+				LinkIncremental="2"
+				GenerateDebugInformation="true"
 				SubSystem="1"
-				RandomizedBaseAddress="1"
-				DataExecutionPrevention="0"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -91,8 +79,6 @@
 			/>
 			<Tool
 				Name="VCBscMakeTool"
-				SuppressStartupBanner="true"
-				OutputFile=".\obj\win32\Release/xilprg.bsc"
 			/>
 			<Tool
 				Name="VCFxCopTool"
@@ -105,14 +91,12 @@
 			/>
 		</Configuration>
 		<Configuration
-			Name="Debug|Win32"
-			OutputDirectory=".\obj\win32\Debug"
-			IntermediateDirectory=".\obj\win32\Debug"
+			Name="Release|Win32"
+			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC60.vsprops"
-			UseOfMFC="0"
-			ATLMinimizesCRunTimeLibraryUsage="false"
-			CharacterSet="2"
+			CharacterSet="0"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -128,48 +112,37 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
-				TypeLibraryName=".\obj\win32\Debug/xilprg.tlb"
-				HeaderFileName=""
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="0"
-				AdditionalIncludeDirectories=".\src,../../../include,../libnero,../../../libs/usbwrap,../../../3rd/libusb-win32-bin-1.2.2.0/include"
-				PreprocessorDefinitions="_DEBUG;WIN32;_CONSOLE;NATIVE_WIN32;_CRT_SECURE_NO_WARNINGS"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
-				RuntimeLibrary="3"
-				PrecompiledHeaderFile=".\obj\win32\Debug/xilprg.pch"
-				AssemblerListingLocation=".\obj\win32\Debug/"
-				ObjectFile=".\obj\win32\Debug/"
-				ProgramDataBaseFileName=".\obj\win32\Debug/"
-				WarningLevel="4"
-				SuppressStartupBanner="true"
-				DebugInformationFormat="4"
+				Optimization="2"
+				EnableIntrinsicFunctions="true"
+				AdditionalIncludeDirectories="../../../include;../../../libs/argtypes;../../../3rd/argtable2-12/src;../libnero;../../../3rd/libusb-win32-bin-1.2.2.0/include"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;NATIVE_WIN32;_CRT_SECURE_NO_WARNINGS;strncasecmp=_strnicmp;strcasecmp=_stricmp"
+				RuntimeLibrary="2"
+				EnableFunctionLevelLinking="true"
+				UsePrecompiledHeader="0"
+				WarningLevel="3"
+				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-				PreprocessorDefinitions="_DEBUG"
-				Culture="1033"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="../libnero/Debug/libnero.lib ../libsync/Debug/libsync.lib ../../../libs/usbwrap/Debug/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
-				OutputFile=".\obj\win32\Debug/xilprg.exe"
-				LinkIncremental="2"
-				SuppressStartupBanner="true"
-				AdditionalLibraryDirectories=".\src"
+				AdditionalOptions="/NODEFAULTLIB:LIBCMT"
+				AdditionalDependencies="../../../libs/argtypes/Release/argtypes.lib ../../../3rd/argtable2-12/src/argtable2.lib ../libnero/Release/libnero.lib ../libsync/Release/libsync.lib ../../../libs/usbwrap/Release/usbwrap.lib ../../../3rd/libusb-win32-bin-1.2.2.0/lib/msvc/libusb.lib"
+				LinkIncremental="1"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile=".\obj\win32\Debug/xilprg.pdb"
 				SubSystem="1"
-				RandomizedBaseAddress="1"
-				DataExecutionPrevention="0"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="2"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -183,8 +156,6 @@
 			/>
 			<Tool
 				Name="VCBscMakeTool"
-				SuppressStartupBanner="true"
-				OutputFile=".\obj\win32\Debug/xilprg.bsc"
 			/>
 			<Tool
 				Name="VCFxCopTool"
@@ -202,338 +173,126 @@
 	<Files>
 		<Filter
 			Name="Source Files"
-			Filter="cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
+			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="src\cable.cpp"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="src\chip.cpp"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="src\cmdline.cpp"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="src\cmds.cpp"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="src\digilent.cpp"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath=".\src\nero.cpp"
+				RelativePath=".\cable.cpp"
 				>
 			</File>
 			<File
-				RelativePath="src\parport.cpp"
+				RelativePath=".\chip.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="src\prgfile.cpp"
+				RelativePath=".\cmdline.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="src\strtable.cpp"
+				RelativePath=".\cmds.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="src\utils.cpp"
+				RelativePath=".\digilent.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="src\vartable.cpp"
+				RelativePath=".\nero.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="src\xilinx.cpp"
+				RelativePath=".\parport.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="src\xilprg.cpp"
+				RelativePath=".\prgfile.cpp"
 				>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalIncludeDirectories=""
-						PreprocessorDefinitions=""
-					/>
-				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\strtable.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\utils.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\vartable.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\xilinx.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\xilprg.cpp"
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath="src\cable.h"
+				RelativePath=".\cable.h"
 				>
 			</File>
 			<File
-				RelativePath="src\chip.h"
+				RelativePath=".\chip.h"
 				>
 			</File>
 			<File
-				RelativePath="src\cmdline.h"
+				RelativePath=".\cmdline.h"
 				>
 			</File>
 			<File
-				RelativePath="src\cmds.h"
+				RelativePath=".\cmds.h"
 				>
 			</File>
 			<File
-				RelativePath="src\digilent.h"
+				RelativePath=".\digilent.h"
 				>
 			</File>
 			<File
-				RelativePath=".\src\nero.h"
+				RelativePath=".\nero.h"
 				>
 			</File>
 			<File
-				RelativePath="src\parport.h"
+				RelativePath=".\parport.h"
 				>
 			</File>
 			<File
-				RelativePath="src\platform.h"
+				RelativePath=".\platform.h"
 				>
 			</File>
 			<File
-				RelativePath="src\prgfile.h"
+				RelativePath=".\prgfile.h"
 				>
 			</File>
 			<File
-				RelativePath="src\strtable.h"
+				RelativePath=".\strtable.h"
 				>
 			</File>
 			<File
-				RelativePath="src\utils.h"
+				RelativePath=".\utils.h"
 				>
 			</File>
 			<File
-				RelativePath="src\vartable.h"
+				RelativePath=".\vartable.h"
 				>
 			</File>
 			<File
-				RelativePath="src\xilprg.h"
+				RelativePath=".\xilprg.h"
 				>
 			</File>
 		</Filter>
-		<File
-			RelativePath="xilprg.conf"
+		<Filter
+			Name="Resource Files"
+			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
+			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
-		</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>
