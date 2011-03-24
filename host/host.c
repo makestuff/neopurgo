@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <string.h>
 #include "libsync.h"
@@ -27,26 +26,10 @@
 #include <sys/time.h>
 #endif
 
-//#define VID 0x1443
-//#define PID 0x0005
 #define VID 0x04B4
 #define PID 0x8613
 
-void dumpSimple(const unsigned char *input, unsigned int length) {
-	while ( length ) {
-		printf(" %02X", *input++);
-		--length;
-	}
-}
-
-#define ENDPOINT_SIZE 512
-
-#define bmNEEDRESPONSE (1<<0)
-#define bmISLAST       (1<<1)
-#define bmSENDZEROS    (0<<2)
-#define bmSENDONES     (1<<2)
-#define bmSENDDATA     (2<<2)
-#define bmSENDMASK     (3<<2)
+void dumpSimple(const unsigned char *input, unsigned int length);
 
 int main(int argc, char *argv[]) {
 
@@ -219,7 +202,7 @@ int main(int argc, char *argv[]) {
 				for ( i = 0; i < fileLen; i++  ) {
 					checksum += buffer[5+i];
 				}
-				printf("Writing five command bytes followed by %d data bytes:", fileLen);
+				printf("Writing five command bytes followed by %lu data bytes:", fileLen);
 				dumpSimple(buffer, 6);
 				printf(" ...");
 				dumpSimple(buffer+byteCount-1, 1);
@@ -348,4 +331,11 @@ cleanup:
 	arg_freetable(argTable, sizeof(argTable)/sizeof(argTable[0]));
 
 	return exitCode;
+}
+
+void dumpSimple(const unsigned char *input, unsigned int length) {
+	while ( length ) {
+		printf(" %02X", *input++);
+		--length;
+	}
 }
