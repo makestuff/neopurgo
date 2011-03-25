@@ -42,7 +42,7 @@ SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle, SyncMode syncMode) {
 	returnCode = usb_control_msg(
 		deviceHandle,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		CMD_SYNC_MODE,            // bRequest
+		CMD_MODE_STATUS,          // bRequest
 		0x0001,                   // wValue
 		0x0000,                   // wIndex
 		NULL,
@@ -122,7 +122,7 @@ SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle, SyncMode syncMode) {
 	returnCode = usb_control_msg(
 		deviceHandle,
 		USB_ENDPOINT_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		CMD_SYNC_MODE,            // bRequest
+		CMD_MODE_STATUS,          // bRequest
 		0x0000,                   // wValue
 		0x0000,                   // wIndex
 		NULL,

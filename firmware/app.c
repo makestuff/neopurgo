@@ -171,31 +171,17 @@ uint8 handleVendorCommand(uint8 cmd) {
 	switch(cmd) {
 	// Put the device in sync mode, so its bulk endpoints can be sync'd with the host software
 	//
-	case CMD_SYNC_MODE:
+	case CMD_MODE_STATUS:
 		if ( SETUP_TYPE == (REQDIR_HOSTTODEVICE | REQTYPE_VENDOR) ) {
-			// Enable sync mode if wValue is nonzero
-			syncSetEnabled(SETUP_VALUE() == 0 ? false : true);
+			// Set MODE: Enable sync mode if the SYNC_MODE bit is set in wValue
+			syncSetEnabled(SETUP_VALUE() & SYNC_MODE ? true : false);
 		} else {
-			// Unrecognised operation
-			return false;
-		}
-		break;
-
-	// Fetch the diagnostic code, so host can query what went wrong.
-	//
-	case CMD_GET_DIAG_CODE:
-		if ( SETUP_TYPE == (REQDIR_DEVICETOHOST | REQTYPE_VENDOR) ) {
-			uint16 *xdata outArray = (uint16 *)EP0BUF;
-
-			// It's an IN operation - prepare the response and send it
+			// Get STATUS: return the diagnostic byte
 			while ( EP0CS & bmEPBUSY );
 			*EP0BUF = m_diagnosticCode;
 			EP0BCH = 0;
 			SYNCDELAY;
 			EP0BCL = 1;
-		} else {
-			// This command does not support OUT operations
-			return false;
 		}
 		break;
 

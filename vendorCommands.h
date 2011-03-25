@@ -17,11 +17,14 @@
 #ifndef VENDORCOMMANDS_H
 #define VENDORCOMMANDS_H
 
-#define CMD_SYNC_MODE           0x80
-#define CMD_GET_DIAG_CODE       0x81
-#define CMD_JTAG_CLOCK_DATA     0x82
-#define CMD_JTAG_CLOCK_FSM      0x83
-#define CMD_JTAG_CLOCK          0x84
-#define CMD_READ_WRITE_EEPROM   0xA2
+// Vendor commands
+#define CMD_MODE_STATUS       0x80
+#define CMD_JTAG_CLOCK_DATA   0x81
+#define CMD_JTAG_CLOCK_FSM    0x82
+#define CMD_JTAG_CLOCK        0x83
+#define CMD_READ_WRITE_EEPROM 0xA2
+
+// Bits in the mode word
+#define SYNC_MODE (1<<0)
 
 #endif
