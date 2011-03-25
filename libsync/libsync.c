@@ -27,7 +27,7 @@ extern char m_syncErrorMessage[];
 
 // Sync with the device
 //
-SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle) {
+SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle, SyncMode syncMode) {
 
 	const uint32 hackLower = 0x6861636B;
 	const uint32 hackUpper = 0x4841434B;
@@ -54,66 +54,69 @@ SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle) {
 		return SYNC_ENABLE;
 	}
 
-	// Try to sync EP2OUT->EP4IN and EP6OUT->EP8IN
-	count = 0;
-	do {
-		u.lword = hackLower;
-		usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | 2, u.bytes, 4, 100);
-		returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | 4, u.bytes, 16, 100);
-		count++;
-	} while ( returnCode < 0 && count < MAX_TRIES );
-	if ( count == MAX_TRIES ) {
-		sprintf(
-			m_syncErrorMessage,
-			"syncBulkEndpoints(): Sync of EP2OUT->EP4IN failed after %d attempts with returnCode %d: %s",
-			count, returnCode, usb_strerror());
-		return SYNC_FAILED;
+	if ( syncMode == SYNC_24 || syncMode == SYNC_BOTH ) {
+		// Try to sync EP2OUT->EP4IN
+		count = 0;
+		do {
+			u.lword = hackLower;
+			usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | 2, u.bytes, 4, 100);
+			returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | 4, u.bytes, 16, 100);
+			count++;
+		} while ( returnCode < 0 && count < MAX_TRIES );
+		if ( count == MAX_TRIES ) {
+			sprintf(
+				m_syncErrorMessage,
+				"syncBulkEndpoints(): Sync of EP2OUT->EP4IN failed after %d attempts with returnCode %d: %s",
+				count, returnCode, usb_strerror());
+			return SYNC_FAILED;
+		}
+		if ( returnCode != 4 ) {
+			sprintf(
+				m_syncErrorMessage,
+				"syncBulkEndpoints(): Sync of EP2OUT->EP4IN read back %d bytes instead of the expected 4",
+				returnCode);
+			return SYNC_FAILED;
+		}
+		if ( u.lword != hackUpper ) {
+			sprintf(
+				m_syncErrorMessage,
+				"syncBulkEndpoints(): Sync of EP2OUT->EP4IN read back 0x%08lX instead of the expected 0x%08lX",
+				u.lword, hackUpper);
+			return SYNC_FAILED;
+		}
 	}
-	if ( returnCode != 4 ) {
-		sprintf(
-			m_syncErrorMessage,
-			"syncBulkEndpoints(): Sync of EP2OUT->EP4IN read back %d bytes instead of the expected 4",
-			returnCode);
-		return SYNC_FAILED;
-	}
-	if ( u.lword != hackUpper ) {
-		sprintf(
-			m_syncErrorMessage,
-			"syncBulkEndpoints(): Sync of EP2OUT->EP4IN read back 0x%08lX instead of the expected 0x%08lX",
-			u.lword, hackUpper);
-		return SYNC_FAILED;
-	}
-	//printf("Sync of EP2OUT->EP4IN succeeded after %d tries\n", count);
 
-	count = 0;
-	do {
-		u.lword = hackLower;
-		usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | 6, u.bytes, 4, 100);
-		returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | 8, u.bytes, 16, 100);
-		count++;
-	} while ( returnCode < 0 && count < MAX_TRIES );
-	if ( count == MAX_TRIES ) {
-		sprintf(
-			m_syncErrorMessage,
-			"syncBulkEndpoints(): Sync of EP6OUT->EP8IN failed after %d attempts: %s",
-			count, usb_strerror());
-		return SYNC_FAILED;
+	if ( syncMode == SYNC_68 || syncMode == SYNC_BOTH ) {
+		// Try to sync EP6OUT->EP8IN
+		count = 0;
+		do {
+			u.lword = hackLower;
+			usb_bulk_write(deviceHandle, USB_ENDPOINT_OUT | 6, u.bytes, 4, 100);
+			returnCode = usb_bulk_read(deviceHandle, USB_ENDPOINT_IN | 8, u.bytes, 16, 100);
+			count++;
+		} while ( returnCode < 0 && count < MAX_TRIES );
+		if ( count == MAX_TRIES ) {
+			sprintf(
+				m_syncErrorMessage,
+				"syncBulkEndpoints(): Sync of EP6OUT->EP8IN failed after %d attempts: %s",
+				count, usb_strerror());
+			return SYNC_FAILED;
+		}
+		if ( returnCode != 4 ) {
+			sprintf(
+				m_syncErrorMessage,
+				"syncBulkEndpoints(): Sync of EP6OUT->EP8IN read back %d bytes instead of the expected 4",
+				returnCode);
+			return SYNC_FAILED;
+		}
+		if ( u.lword != hackUpper ) {
+			sprintf(
+				m_syncErrorMessage,
+				"syncBulkEndpoints(): Sync of EP6OUT->EP8IN read back 0x%08lX instead of the expected 0x%08lX",
+				u.lword, hackUpper);
+			return SYNC_FAILED;
+		}
 	}
-	if ( returnCode != 4 ) {
-		sprintf(
-			m_syncErrorMessage,
-			"syncBulkEndpoints(): Sync of EP6OUT->EP8IN read back %d bytes instead of the expected 4",
-			returnCode);
-		return SYNC_FAILED;
-	}
-	if ( u.lword != hackUpper ) {
-		sprintf(
-			m_syncErrorMessage,
-			"syncBulkEndpoints(): Sync of EP6OUT->EP8IN read back 0x%08lX instead of the expected 0x%08lX",
-			u.lword, hackUpper);
-		return SYNC_FAILED;
-	}
-	//printf("Sync of EP6OUT->EP8IN succeeded after %d tries\n", count);
 
 	// Bring the device out of sync mode
 	returnCode = usb_control_msg(

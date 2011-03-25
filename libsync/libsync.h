@@ -28,12 +28,18 @@ typedef enum {
 	SYNC_DISABLE
 } SyncStatus;
 
+typedef enum {
+	SYNC_24,
+	SYNC_68,
+	SYNC_BOTH
+} SyncMode;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // Try to sync with the device
-SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle);
+SyncStatus syncBulkEndpoints(UsbDeviceHandle *deviceHandle, SyncMode syncMode);
 
 // Get the last error message, or junk if no error occurred.
 const char *syncStrError(void);
