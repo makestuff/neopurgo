@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 		goto cleanup;
 	}
 
-	if ( syncBulkEndpoints(deviceHandle) ) {
+	if ( syncBulkEndpoints(deviceHandle, SYNC_68) ) {
 		printf("Failed to sync bulk endpoints: %s\n", syncStrError());
 		exitCode = 100;
 		goto cleanup;
