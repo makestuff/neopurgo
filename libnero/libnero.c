@@ -58,7 +58,7 @@ NeroStatus neroInitialise(uint16 vid, uint16 pid) {
 		return NERO_USB_INIT;
 	}
 
-	if ( syncBulkEndpoints(m_deviceHandle) != SYNC_SUCCESS ) {
+	if ( syncBulkEndpoints(m_deviceHandle, SYNC_24) != SYNC_SUCCESS ) {
 		sprintf(m_neroErrorMessage, "neroInitialise(): %s", syncStrError());
 		fail(NERO_SYNC);
 	}
@@ -139,7 +139,7 @@ NeroStatus neroClockFSM(uint32 bitPattern, uint8 transitionCount) {
 		5000                      // timeout (ms)
 	);
 	if ( returnCode < 0 ) {
-		sprintf(m_neroErrorMessage, "neroClockFSM(): %s", usbStrError());
+		sprintf(m_neroErrorMessage, "neroClockFSM(): %s", usb_strerror());
 		return NERO_CLOCKFSM;
 	}
 	return NERO_SUCCESS;
@@ -159,7 +159,7 @@ NeroStatus neroClocks(uint32 numClocks) {
 		5000               // timeout (ms)
 	);
 	if ( returnCode < 0 ) {
-		sprintf(m_neroErrorMessage, "neroClocks(): %s", usbStrError());
+		sprintf(m_neroErrorMessage, "neroClocks(): %s", usb_strerror());
 		return NERO_CLOCKS;
 	}
 	return NERO_SUCCESS;
@@ -192,7 +192,7 @@ static NeroStatus beginShift(uint32 numBits, SendType sendType, bool isLast, boo
 		5000                  // timeout (ms)
 	);
 	if ( returnCode < 0 ) {
-		sprintf(m_neroErrorMessage, "beginShift(): %s", usbStrError());
+		sprintf(m_neroErrorMessage, "beginShift(): %s", usb_strerror());
 		return NERO_BEGIN_SHIFT;
 	}
 	return NERO_SUCCESS;
@@ -207,7 +207,7 @@ static NeroStatus doSend(const uint8 *sendPtr, uint16 chunkSize) {
 		5000                     // timeout in milliseconds
 	);
 	if ( returnCode < 0 ) {
-		sprintf(m_neroErrorMessage, "doSend(): %s", usbStrError());
+		sprintf(m_neroErrorMessage, "doSend(): %s", usb_strerror());
 		return NERO_SEND;
 	}
 	return NERO_SUCCESS;
@@ -222,7 +222,7 @@ static NeroStatus doReceive(uint8 *receivePtr, uint16 chunkSize) {
 		5000                    // timeout in milliseconds
 	);
 	if ( returnCode < 0 ) {
-		sprintf(m_neroErrorMessage, "doReceive(): %s", usbStrError());
+		sprintf(m_neroErrorMessage, "doReceive(): %s", usb_strerror());
 		return NERO_RECEIVE;
 	}
 	return NERO_SUCCESS;
