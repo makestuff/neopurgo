@@ -182,6 +182,8 @@ void jtagShiftBegin(uint32 numBits, uint8 flagByte) {
 	m_flagByte = flagByte;
 }
 
+// See if a shift operation is pending
+//
 bool jtagIsShiftPending(void) {
 	return (m_numBits != 0);
 }
@@ -239,7 +241,7 @@ void jtagShiftExecute(void) {
 						TCK = 0;
 						i <<= 1;
 					}
-					*outPtr++ = tdoByte;
+					*outPtr = tdoByte;
 				} else {
 					// This is not the last chunk
 					bytesRemaining = (bitsRead>>3);
@@ -250,13 +252,11 @@ void jtagShiftExecute(void) {
 				SYNCDELAY; EP4BCH = MSB(bytesRead);  // Initiate send of the copied data
 				SYNCDELAY; EP4BCL = LSB(bytesRead);
 				SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
-
 				m_numBits -= bitsRead;
 			}
 		} else {
 			// The host is giving us data, but does not need a response (xdn)
 			xdata uint16 bitsRead, bitsRemaining, bytesRead, bytesRemaining;
-			xdata uint16 i;
 			while ( m_numBits ) {
 				while ( EP2468STAT & bmEP2EMPTY );  // Wait for some EP2OUT data
 				bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
@@ -277,7 +277,7 @@ void jtagShiftExecute(void) {
 					while ( bytesRemaining-- ) {
 						shiftOut(*inPtr++);
 					}
-					tdiByte = *inPtr++;  // Now do the bits in the final byte
+					tdiByte = *inPtr;  // Now do the bits in the final byte
 					i = 1;
 					while ( i && leftOver ) {
 						leftOver--;
@@ -317,7 +317,6 @@ void jtagShiftExecute(void) {
 				bitsRead = (m_numBits >= (ENDPOINT_SIZE<<3)) ? ENDPOINT_SIZE<<3 : m_numBits;
 				bytesRead = bitsToBytes(bitsRead);
 
-				inPtr = EP2FIFOBUF;
 				outPtr = EP4FIFOBUF;
 				if ( bitsRead == m_numBits ) {
 					// This is the last chunk
@@ -343,7 +342,7 @@ void jtagShiftExecute(void) {
 						TCK = 0;
 						i <<= 1;
 					}
-					*outPtr++ = tdoByte;
+					*outPtr = tdoByte;
 				} else {
 					// This is not the last chunk
 					bytesRemaining = (bitsRead>>3);
@@ -379,6 +378,7 @@ void jtagShiftExecute(void) {
 				TCK = 1;
 				TCK = 0;
 			}
+			m_numBits = 0UL;
 		}
 	}
 }
