@@ -93,6 +93,91 @@ static void shiftOut(uint8 c) {
 	_endasm;
 }
 
+// JTAG-clock all 512 bytes from the EP2 FIFO buffer
+//
+static void blockShiftOut(void) {
+	_asm
+		mov    r0, #0
+		mov    dpl, #_EP2FIFOBUF
+		mov    dph, #(_EP2FIFOBUF >> 8)
+	loop:
+		movx   a, @dptr
+		inc    dptr
+		rrc    a
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		nop
+		clr    _TCK
+
+		movx   a, @dptr
+		inc    dptr
+		rrc    a
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		rrc    a
+		clr    _TCK
+		mov    _TDI, c
+		setb   _TCK
+		nop
+		clr    _TCK
+
+		djnz   r0, loop
+		ret
+	_endasm;
+}
+
 // JTAG-clock the supplied byte into TDI, MSB first. Return the byte clocked out of TDO.
 //
 // Lifted from:
@@ -267,10 +352,10 @@ void jtagShiftExecute(void) {
 					break;
 				}
 
-				inPtr = EP2FIFOBUF;
 				if ( bitsRead == m_numBits ) {
 					// This is the last chunk
 					xdata uint8 tdiByte, leftOver, i;
+					inPtr = EP2FIFOBUF;
 					bitsRemaining = (bitsRead-1) & 0xFFF8;        // Now an integer number of bytes
 					leftOver = (uint8)(bitsRead - bitsRemaining); // How many bits in last byte (1-8)
 					bytesRemaining = (bitsRemaining>>3);
@@ -291,13 +376,9 @@ void jtagShiftExecute(void) {
 						i <<= 1;
 					}
 				} else {
-					// This is not the last chunk
-					bytesRemaining = (bitsRead>>3);
-					while ( bytesRemaining-- ) {
-						shiftOut(*inPtr++);
-					}
+					// This is not the last chunk, so we've to 512 bytes to shift
+					blockShiftOut();
 				}
-
 				SYNCDELAY; OUTPKTEND = bmSKIP | 2;   // Acknowledge receipt of this packet
 				m_numBits -= bitsRead;
 			}
